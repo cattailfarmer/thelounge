@@ -217,8 +217,13 @@ module.exports = {
 	//
 	// This value can also be supplied through the `ALIENHAND_PAYLOAD_RESOLVER`
 	// environment variable when The Lounge is launched by AlienHand.
+	//
+	// `payloadResolverToken` is the prototype shared secret sent as a bearer
+	// token when the browser resolves payload UUIDs. It can be supplied through
+	// `ALIENHAND_PAYLOAD_RESOLVER_TOKEN` by the AlienHand launcher.
 	alienhand: {
 		payloadResolverBaseUrl: "",
+		payloadResolverToken: "",
 	},
 
 	// ### `leaveMessage`

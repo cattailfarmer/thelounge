@@ -31,6 +31,7 @@ type FileUpload = {
 
 type AlienHand = {
 	payloadResolverBaseUrl: string;
+	payloadResolverToken: string;
 };
 
 export type Defaults = Pick<
@@ -254,6 +255,12 @@ class Config {
 
 		if (envPayloadResolver) {
 			this.values.alienhand.payloadResolverBaseUrl = envPayloadResolver;
+		}
+
+		const envPayloadResolverToken = process.env.ALIENHAND_PAYLOAD_RESOLVER_TOKEN;
+
+		if (envPayloadResolverToken) {
+			this.values.alienhand.payloadResolverToken = envPayloadResolverToken;
 		}
 
 		if (this.values.alienhand.payloadResolverBaseUrl) {

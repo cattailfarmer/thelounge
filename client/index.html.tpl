@@ -47,7 +47,7 @@
 	<meta name="theme-color" content="<%- themeColor %>">
 
 	</head>
-	<body class="<%- public ? " public" : "" %>" data-transports="<%- JSON.stringify(transports) %>" data-alienhand-payload-resolver="<%- alienhand.payloadResolverBaseUrl %>">
+	<body class="<%- public ? " public" : "" %>" data-transports="<%- JSON.stringify(transports) %>" data-alienhand-payload-resolver="<%- alienhand.payloadResolverBaseUrl %>" data-alienhand-payload-resolver-token="<%- alienhand.payloadResolverToken %>">
 		<div id="app"></div>
 		<div id="loading">
 			<div class="window">

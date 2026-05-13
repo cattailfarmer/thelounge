@@ -3,6 +3,7 @@ import {store} from "../store";
 
 const ENVELOPE_PROTOCOL = "AH1";
 const RESOLVER_STORAGE_KEY = "alienhandPayloadResolver";
+const RESOLVER_TOKEN_STORAGE_KEY = "alienhandPayloadResolverToken";
 
 type AlienHandEnvelope = {
 	appId: string;
@@ -15,6 +16,7 @@ type AlienHandEnvelope = {
 type AlienHandWindow = Window &
 	typeof globalThis & {
 		__ALIENHAND_PAYLOAD_RESOLVER__?: string;
+		__ALIENHAND_PAYLOAD_RESOLVER_TOKEN__?: string;
 	};
 
 export function parseAlienHandEnvelope(text?: string): AlienHandEnvelope | null {
@@ -82,6 +84,35 @@ export function getAlienHandPayloadResolverBase(): string | null {
 	}
 }
 
+export function getAlienHandPayloadResolverToken(): string | null {
+	const alienhandWindow = window as AlienHandWindow;
+	const configured = normalizeToken(alienhandWindow.__ALIENHAND_PAYLOAD_RESOLVER_TOKEN__);
+
+	if (configured) {
+		return configured;
+	}
+
+	const serverConfigured = normalizeToken(
+		store.state.serverConfiguration?.alienhand?.payloadResolverToken
+	);
+
+	if (serverConfigured) {
+		return serverConfigured;
+	}
+
+	const templateConfigured = normalizeToken(document.body.dataset.alienhandPayloadResolverToken);
+
+	if (templateConfigured) {
+		return templateConfigured;
+	}
+
+	try {
+		return normalizeToken(window.localStorage.getItem(RESOLVER_TOKEN_STORAGE_KEY));
+	} catch {
+		return null;
+	}
+}
+
 export async function resolveAlienHandMessage(message: SharedMsg): Promise<boolean> {
 	const envelope = parseAlienHandEnvelope(message.text);
 
@@ -101,13 +132,19 @@ export async function resolveAlienHandMessage(message: SharedMsg): Promise<boole
 	}
 
 	message.alienhand = buildAlienHandStatusRow(envelope, "payload_resolving", "resolving");
+	const resolverToken = getAlienHandPayloadResolverToken();
+	const headers: Record<string, string> = {Accept: "application/json"};
+
+	if (resolverToken) {
+		headers.Authorization = `Bearer ${resolverToken}`;
+	}
 
 	try {
 		const response = await fetch(
 			`${resolverBase}/alienhand/payloads/${encodeURIComponent(envelope.messageUuid)}/render`,
 			{
 				credentials: "omit",
-				headers: {Accept: "application/json"},
+				headers,
 			}
 		);
 
@@ -165,4 +202,14 @@ function normalizeBaseUrl(value: unknown): string | null {
 	}
 
 	return trimmed.replace(/\/+$/, "");
+}
+
+function normalizeToken(value: unknown): string | null {
+	if (typeof value !== "string") {
+		return null;
+	}
+
+	const trimmed = value.trim();
+
+	return trimmed || null;
 }

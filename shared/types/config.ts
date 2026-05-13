@@ -9,6 +9,7 @@ type SharedConfigurationBase = {
 	prefetch: boolean;
 	alienhand: {
 		payloadResolverBaseUrl: string;
+		payloadResolverToken: string;
 	};
 	fileUpload: boolean;
 	ldapEnabled: boolean;
