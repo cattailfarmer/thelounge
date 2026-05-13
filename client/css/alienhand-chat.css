@@ -259,6 +259,10 @@
 	box-shadow: inset 4px 0 0 var(--alienhand-workbench-hit);
 }
 
+#chat .alienhand-workbench__card--bookmarked {
+	box-shadow: inset 4px 0 0 #dcb95a;
+}
+
 #chat .alienhand-workbench__card p {
 	margin: 0.45rem 0;
 	white-space: pre-wrap;
@@ -280,6 +284,40 @@
 	height: 1.5rem;
 	line-height: 1;
 	width: 1.5rem;
+}
+
+#chat .alienhand-workbench__actions,
+#chat .alienhand-workbench__bookmark-form {
+	display: flex;
+	gap: 0.45rem;
+	margin-top: 0.5rem;
+}
+
+#chat .alienhand-workbench__bookmark-form input {
+	background: #fff;
+	border: 1px solid var(--alienhand-border);
+	border-radius: 999px;
+	color: var(--alienhand-text);
+	min-width: 0;
+	padding: 0.35rem 0.55rem;
+	width: 100%;
+}
+
+#chat .alienhand-workbench__bookmarks {
+	display: flex;
+	flex-direction: column;
+	gap: 0.25rem;
+	margin-top: 0.5rem;
+}
+
+#chat .alienhand-workbench__bookmarks span {
+	background: #fff6df;
+	border: 1px solid #dec070;
+	border-radius: 7px;
+	color: #6d5214;
+	font-size: 0.75rem;
+	line-height: 1.35;
+	padding: 0.35rem 0.45rem;
 }
 
 #chat .alienhand-workbench__chapter-form {

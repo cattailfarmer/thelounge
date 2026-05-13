@@ -45,6 +45,17 @@ export type AlienHandConversationChapter = {
 	provenance?: Record<string, unknown>;
 };
 
+export type AlienHandConversationBookmark = {
+	bookmark_id: string;
+	target_type: "block" | "cut" | "chapter";
+	target_id: string;
+	scope: string;
+	label: string;
+	note: string;
+	persistence: string;
+	promotion_state: string;
+};
+
 export type AlienHandRefinementSearchHit = {
 	term: string;
 	block_id: string;
@@ -246,6 +257,18 @@ export async function listAlienHandRefinementChapters(
 	return response.chapters || [];
 }
 
+export async function listAlienHandRefinementBookmarks(
+	channelUuid: string,
+	targetType?: AlienHandConversationBookmark["target_type"]
+): Promise<AlienHandConversationBookmark[]> {
+	const targetTypeQuery = targetType ? `&target_type=${encodeURIComponent(targetType)}` : "";
+	const response = await fetchAlienHandRefinement<{bookmarks?: AlienHandConversationBookmark[]}>(
+		`/bookmarks?channel=${encodeURIComponent(channelUuid)}${targetTypeQuery}`
+	);
+
+	return response.bookmarks || [];
+}
+
 export async function searchAlienHandRefinement(
 	query: string
 ): Promise<AlienHandRefinementSearchHit[]> {
@@ -300,6 +323,28 @@ export async function createAlienHandRefinementChapter(
 	);
 
 	return response.chapter;
+}
+
+export async function createAlienHandRefinementBookmark(
+	targetType: AlienHandConversationBookmark["target_type"],
+	targetId: string,
+	label: string,
+	note: string
+): Promise<AlienHandConversationBookmark> {
+	const response = await fetchAlienHandRefinement<{bookmark: AlienHandConversationBookmark}>(
+		"/bookmarks",
+		{
+			body: JSON.stringify({
+				label,
+				note,
+				target_id: targetId,
+				target_type: targetType,
+			}),
+			method: "POST",
+		}
+	);
+
+	return response.bookmark;
 }
 
 async function fetchAlienHandRefinement<T>(path: string, init: RequestInit = {}): Promise<T> {

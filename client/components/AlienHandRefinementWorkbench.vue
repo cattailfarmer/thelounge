@@ -41,6 +41,10 @@
 					:class="[
 						'alienhand-workbench__card',
 						{'alienhand-workbench__card--hit': searchHitBlockIds.has(block.block_id)},
+						{
+							'alienhand-workbench__card--bookmarked':
+								targetBookmarks('block', block.block_id).length,
+						},
 					]"
 				>
 					<div class="alienhand-workbench__meta">
@@ -48,13 +52,39 @@
 						<time>{{ formatTimestamp(block.created_at) }}</time>
 					</div>
 					<p>{{ block.presentation }}</p>
-					<button
-						class="btn btn-sm"
-						:disabled="pendingBlockId === block.block_id"
-						@click="createCut(block)"
+					<div v-if="targetBookmarks('block', block.block_id).length" class="alienhand-workbench__bookmarks">
+						<span
+							v-for="bookmark in targetBookmarks('block', block.block_id)"
+							:key="bookmark.bookmark_id"
+							:title="bookmark.note"
+						>
+							Bookmark: {{ bookmark.note || bookmark.label || bookmark.bookmark_id }}
+						</span>
+					</div>
+					<div class="alienhand-workbench__actions">
+						<button
+							class="btn btn-sm"
+							:disabled="pendingBlockId === block.block_id"
+							@click="createCut(block)"
+						>
+							Inject into cuts
+						</button>
+					</div>
+					<form
+						class="alienhand-workbench__bookmark-form"
+						@submit.prevent="createBookmark('block', block.block_id)"
 					>
-						Inject into cuts
-					</button>
+						<input
+							v-model="bookmarkDrafts[bookmarkKey('block', block.block_id)]"
+							placeholder="Bookmark note"
+						/>
+						<button
+							class="btn btn-sm"
+							:disabled="!canCreateBookmark('block', block.block_id)"
+						>
+							Bookmark
+						</button>
+					</form>
 				</article>
 			</section>
 
@@ -67,7 +97,17 @@
 				<p v-if="!activeCuts.length" class="alienhand-workbench__empty">
 					Use "Inject into cuts" on a raw block to start composing.
 				</p>
-				<article v-for="cut in activeCuts" :key="cut.cut_id" class="alienhand-workbench__card">
+				<article
+					v-for="cut in activeCuts"
+					:key="cut.cut_id"
+					:class="[
+						'alienhand-workbench__card',
+						{
+							'alienhand-workbench__card--bookmarked':
+								targetBookmarks('cut', cut.cut_id).length,
+						},
+					]"
+				>
 					<div class="alienhand-workbench__meta">
 						<span>Cut {{ cut.position + 1 }}</span>
 						<button
@@ -79,6 +119,30 @@
 						</button>
 					</div>
 					<p>{{ blockById.get(cut.source_block_id)?.presentation || cut.source_block_id }}</p>
+					<div v-if="targetBookmarks('cut', cut.cut_id).length" class="alienhand-workbench__bookmarks">
+						<span
+							v-for="bookmark in targetBookmarks('cut', cut.cut_id)"
+							:key="bookmark.bookmark_id"
+							:title="bookmark.note"
+						>
+							Bookmark: {{ bookmark.note || bookmark.label || bookmark.bookmark_id }}
+						</span>
+					</div>
+					<form
+						class="alienhand-workbench__bookmark-form"
+						@submit.prevent="createBookmark('cut', cut.cut_id)"
+					>
+						<input
+							v-model="bookmarkDrafts[bookmarkKey('cut', cut.cut_id)]"
+							placeholder="Bookmark note"
+						/>
+						<button
+							class="btn btn-sm"
+							:disabled="!canCreateBookmark('cut', cut.cut_id)"
+						>
+							Bookmark
+						</button>
+					</form>
 				</article>
 				<form class="alienhand-workbench__chapter-form" @submit.prevent="createChapter">
 					<input v-model="chapterTitle" placeholder="Chapter title" />
@@ -95,13 +159,50 @@
 				<p v-if="!chapters.length" class="alienhand-workbench__empty">
 					Chapters created from cuts will appear here.
 				</p>
-				<article v-for="chapter in chapters" :key="chapter.chapter_id" class="alienhand-workbench__card">
+				<article
+					v-for="chapter in chapters"
+					:key="chapter.chapter_id"
+					:class="[
+						'alienhand-workbench__card',
+						{
+							'alienhand-workbench__card--bookmarked':
+								targetBookmarks('chapter', chapter.chapter_id).length,
+						},
+					]"
+				>
 					<div class="alienhand-workbench__meta">
 						<span>{{ chapter.member_cut_ids.length }} cuts</span>
 						<time>{{ formatTimestamp(chapter.updated_at) }}</time>
 					</div>
 					<h4>{{ chapter.title }}</h4>
 					<p>{{ chapter.summary || "No summary yet." }}</p>
+					<div
+						v-if="targetBookmarks('chapter', chapter.chapter_id).length"
+						class="alienhand-workbench__bookmarks"
+					>
+						<span
+							v-for="bookmark in targetBookmarks('chapter', chapter.chapter_id)"
+							:key="bookmark.bookmark_id"
+							:title="bookmark.note"
+						>
+							Bookmark: {{ bookmark.note || bookmark.label || bookmark.bookmark_id }}
+						</span>
+					</div>
+					<form
+						class="alienhand-workbench__bookmark-form"
+						@submit.prevent="createBookmark('chapter', chapter.chapter_id)"
+					>
+						<input
+							v-model="bookmarkDrafts[bookmarkKey('chapter', chapter.chapter_id)]"
+							placeholder="Bookmark note"
+						/>
+						<button
+							class="btn btn-sm"
+							:disabled="!canCreateBookmark('chapter', chapter.chapter_id)"
+						>
+							Bookmark
+						</button>
+					</form>
 				</article>
 			</section>
 		</div>
@@ -121,17 +222,22 @@ import {computed, defineComponent, PropType, ref, watch} from "vue";
 import type {ClientChan} from "../js/types";
 import {
 	alienHandChannelUuidFromName,
+	createAlienHandRefinementBookmark,
 	createAlienHandRefinementChapter,
 	createAlienHandRefinementCut,
 	listAlienHandRefinementBlocks,
+	listAlienHandRefinementBookmarks,
 	listAlienHandRefinementChapters,
 	listAlienHandRefinementCuts,
 	removeAlienHandRefinementCut,
 	searchAlienHandRefinement,
+	type AlienHandConversationBookmark,
 	type AlienHandConversationBlock,
 	type AlienHandConversationChapter,
 	type AlienHandConversationCut,
 } from "../js/helpers/alienhand";
+
+type BookmarkTargetType = AlienHandConversationBookmark["target_type"];
 
 export default defineComponent({
 	name: "AlienHandRefinementWorkbench",
@@ -142,10 +248,13 @@ export default defineComponent({
 		const blocks = ref<AlienHandConversationBlock[]>([]);
 		const cuts = ref<AlienHandConversationCut[]>([]);
 		const chapters = ref<AlienHandConversationChapter[]>([]);
+		const bookmarks = ref<AlienHandConversationBookmark[]>([]);
+		const bookmarkDrafts = ref<Record<string, string>>({});
 		const loading = ref(false);
 		const error = ref("");
 		const pendingBlockId = ref("");
 		const pendingCutId = ref("");
+		const pendingBookmarkKey = ref("");
 		const searchTerm = ref("");
 		const searchHitBlockIds = ref(new Set<string>());
 		const chapterTitle = ref("");
@@ -160,10 +269,25 @@ export default defineComponent({
 		const blockById = computed(
 			() => new Map(blocks.value.map((block) => [block.block_id, block]))
 		);
+		const bookmarkKey = (targetType: BookmarkTargetType, targetId: string) =>
+			`${targetType}:${targetId}`;
+		const bookmarksByTarget = computed(() => {
+			const grouped = new Map<string, AlienHandConversationBookmark[]>();
+
+			for (const bookmark of bookmarks.value) {
+				const key = bookmarkKey(bookmark.target_type, bookmark.target_id);
+				const group = grouped.get(key) || [];
+				group.push(bookmark);
+				grouped.set(key, group);
+			}
+
+			return grouped;
+		});
 		const rawDebugText = computed(() =>
 			JSON.stringify(
 				{
 					blocks: blocks.value,
+					bookmarks: bookmarks.value,
 					chapters: chapters.value,
 					cuts: cuts.value,
 				},
@@ -181,15 +305,17 @@ export default defineComponent({
 			error.value = "";
 
 			try {
-				const [nextBlocks, nextCuts, nextChapters] = await Promise.all([
+				const [nextBlocks, nextCuts, nextChapters, nextBookmarks] = await Promise.all([
 					listAlienHandRefinementBlocks(channelUuid.value),
 					listAlienHandRefinementCuts(channelUuid.value),
 					listAlienHandRefinementChapters(channelUuid.value),
+					listAlienHandRefinementBookmarks(channelUuid.value),
 				]);
 
 				blocks.value = nextBlocks;
 				cuts.value = nextCuts;
 				chapters.value = nextChapters;
+				bookmarks.value = nextBookmarks;
 			} catch (caught) {
 				error.value = caught instanceof Error ? caught.message : String(caught);
 			} finally {
@@ -275,6 +401,37 @@ export default defineComponent({
 			}
 		};
 
+		const targetBookmarks = (targetType: BookmarkTargetType, targetId: string) =>
+			bookmarksByTarget.value.get(bookmarkKey(targetType, targetId)) || [];
+
+		const canCreateBookmark = (targetType: BookmarkTargetType, targetId: string) => {
+			const key = bookmarkKey(targetType, targetId);
+			return Boolean(bookmarkDrafts.value[key]?.trim()) && pendingBookmarkKey.value !== key;
+		};
+
+		const createBookmark = async (targetType: BookmarkTargetType, targetId: string) => {
+			const key = bookmarkKey(targetType, targetId);
+			const note = bookmarkDrafts.value[key]?.trim() || "";
+
+			if (!note) {
+				error.value = "Add a note before creating a bookmark.";
+				return;
+			}
+
+			pendingBookmarkKey.value = key;
+			error.value = "";
+
+			try {
+				await createAlienHandRefinementBookmark(targetType, targetId, "Workbench bookmark", note);
+				delete bookmarkDrafts.value[key];
+				await refresh();
+			} catch (caught) {
+				error.value = caught instanceof Error ? caught.message : String(caught);
+			} finally {
+				pendingBookmarkKey.value = "";
+			}
+		};
+
 		const formatTimestamp = (value: string) => {
 			const timestamp = Date.parse(value);
 
@@ -291,6 +448,8 @@ export default defineComponent({
 				blocks.value = [];
 				cuts.value = [];
 				chapters.value = [];
+				bookmarks.value = [];
+				bookmarkDrafts.value = {};
 				searchHitBlockIds.value = new Set();
 				await refresh();
 			},
@@ -300,11 +459,16 @@ export default defineComponent({
 		return {
 			activeCuts,
 			blockById,
+			bookmarkDrafts,
+			bookmarkKey,
+			bookmarks,
 			blocks,
+			canCreateBookmark,
 			channelUuid,
 			chapterSummary,
 			chapterTitle,
 			chapters,
+			createBookmark,
 			createChapter,
 			createCut,
 			cuts,
@@ -323,6 +487,7 @@ export default defineComponent({
 			showEditsPane,
 			showRawPane,
 			showRawText,
+			targetBookmarks,
 		};
 	},
 });
