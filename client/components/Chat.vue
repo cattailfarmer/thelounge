@@ -59,6 +59,17 @@
 						@click="openMentions"
 					/>
 					<button
+						v-if="alienHandChannelUuid"
+						:class="[
+							'alienhand-workbench-toggle',
+							{'alienhand-workbench-toggle--active': showAlienHandWorkbench},
+						]"
+						aria-label="Toggle AlienHand refinement workbench"
+						@click="showAlienHandWorkbench = !showAlienHandWorkbench"
+					>
+						Cuts
+					</button>
+					<button
 						class="menu"
 						aria-label="Open the context menu"
 						@click="openContextMenu"
@@ -100,6 +111,10 @@
 						<div class="scroll-down-arrow" />
 					</button>
 					<ChatUserList v-if="channel.type === 'channel'" :channel="channel" />
+					<AlienHandRefinementWorkbench
+						v-if="showAlienHandWorkbench && alienHandChannelUuid"
+						:channel="channel"
+					/>
 					<MessageList
 						ref="messageList"
 						:network="network"
@@ -129,6 +144,7 @@ import ChatInput from "./ChatInput.vue";
 import ChatUserList from "./ChatUserList.vue";
 import SidebarToggle from "./SidebarToggle.vue";
 import MessageSearchForm from "./MessageSearchForm.vue";
+import AlienHandRefinementWorkbench from "./AlienHandRefinementWorkbench.vue";
 import ListBans from "./Special/ListBans.vue";
 import ListInvites from "./Special/ListInvites.vue";
 import ListChannels from "./Special/ListChannels.vue";
@@ -138,6 +154,7 @@ import type {ClientNetwork, ClientChan} from "../js/types";
 import {useStore} from "../js/store";
 import {SpecialChanType, ChanType} from "../../shared/types/chan";
 import parseStyle from "../js/helpers/ircmessageparser/parseStyle";
+import {alienHandChannelUuidFromName} from "../js/helpers/alienhand";
 
 export default defineComponent({
 	name: "Chat",
@@ -148,6 +165,7 @@ export default defineComponent({
 		ChatUserList,
 		SidebarToggle,
 		MessageSearchForm,
+		AlienHandRefinementWorkbench,
 	},
 	props: {
 		network: {type: Object as PropType<ClientNetwork>, required: true},
@@ -160,6 +178,7 @@ export default defineComponent({
 
 		const messageList = ref<typeof MessageList>();
 		const topicInput = ref<HTMLInputElement | null>(null);
+		const showAlienHandWorkbench = ref(false);
 
 		const plainTopic = computed(() => {
 			const topic = props.channel.topic;
@@ -187,6 +206,10 @@ export default defineComponent({
 
 			return undefined;
 		});
+
+		const alienHandChannelUuid = computed(() =>
+			alienHandChannelUuidFromName(props.channel.name)
+		);
 
 		const channelChanged = () => {
 			// Triggered when active channel is set or changed
@@ -246,6 +269,7 @@ export default defineComponent({
 		watch(
 			() => props.channel,
 			() => {
+				showAlienHandWorkbench.value = false;
 				channelChanged();
 			}
 		);
@@ -275,8 +299,10 @@ export default defineComponent({
 			store,
 			messageList,
 			topicInput,
+			alienHandChannelUuid,
 			plainTopic,
 			specialComponent,
+			showAlienHandWorkbench,
 			hideUserVisibleError,
 			editTopic,
 			saveTopic,

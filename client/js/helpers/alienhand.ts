@@ -13,6 +13,46 @@ type AlienHandEnvelope = {
 	timestamp: string;
 };
 
+export type AlienHandConversationBlock = {
+	block_id: string;
+	channel_uuid: string;
+	message_uuid: string;
+	sender: string;
+	sender_type: string;
+	created_at: string;
+	payload_kind: string;
+	presentation: string;
+	raw_refs: Record<string, unknown>[];
+	metadata?: Record<string, unknown>;
+};
+
+export type AlienHandConversationCut = {
+	cut_id: string;
+	source_block_id: string;
+	position: number;
+	status: string;
+	created_at: string;
+};
+
+export type AlienHandConversationChapter = {
+	chapter_id: string;
+	title: string;
+	summary: string;
+	member_cut_ids: string[];
+	member_block_ids: string[];
+	created_at: string;
+	updated_at: string;
+	provenance?: Record<string, unknown>;
+};
+
+export type AlienHandRefinementSearchHit = {
+	term: string;
+	block_id: string;
+	offset: number;
+	chapter_id?: string | null;
+	cut_id?: string | null;
+};
+
 type AlienHandWindow = Window &
 	typeof globalThis & {
 		__ALIENHAND_PAYLOAD_RESOLVER__?: string;
@@ -53,6 +93,16 @@ export function parseAlienHandEnvelope(text?: string): AlienHandEnvelope | null 
 		nick: values.n,
 		timestamp: values.t,
 	};
+}
+
+export function alienHandChannelUuidFromName(name?: string): string | null {
+	if (!name) {
+		return null;
+	}
+
+	const normalized = name.trim().replace(/^#/, "").toLowerCase();
+
+	return /^[0-9a-f]{32}$/.test(normalized) ? normalized : null;
 }
 
 export function getAlienHandPayloadResolverBase(): string | null {
@@ -163,6 +213,126 @@ export async function resolveAlienHandMessage(message: SharedMsg): Promise<boole
 	}
 
 	return true;
+}
+
+export async function listAlienHandRefinementBlocks(
+	channelUuid: string
+): Promise<AlienHandConversationBlock[]> {
+	const response = await fetchAlienHandRefinement<{blocks?: AlienHandConversationBlock[]}>(
+		`/blocks?channel=${encodeURIComponent(channelUuid)}`
+	);
+
+	return response.blocks || [];
+}
+
+export async function listAlienHandRefinementCuts(
+	channelUuid: string,
+	status = "active"
+): Promise<AlienHandConversationCut[]> {
+	const response = await fetchAlienHandRefinement<{cuts?: AlienHandConversationCut[]}>(
+		`/cuts?channel=${encodeURIComponent(channelUuid)}&status=${encodeURIComponent(status)}`
+	);
+
+	return response.cuts || [];
+}
+
+export async function listAlienHandRefinementChapters(
+	channelUuid: string
+): Promise<AlienHandConversationChapter[]> {
+	const response = await fetchAlienHandRefinement<{chapters?: AlienHandConversationChapter[]}>(
+		`/chapters?channel=${encodeURIComponent(channelUuid)}`
+	);
+
+	return response.chapters || [];
+}
+
+export async function searchAlienHandRefinement(
+	query: string
+): Promise<AlienHandRefinementSearchHit[]> {
+	const response = await fetchAlienHandRefinement<{hits?: AlienHandRefinementSearchHit[]}>(
+		`/search?q=${encodeURIComponent(query)}`
+	);
+
+	return response.hits || [];
+}
+
+export async function createAlienHandRefinementCut(
+	sourceBlockId: string,
+	position?: number
+): Promise<AlienHandConversationCut> {
+	const response = await fetchAlienHandRefinement<{cut: AlienHandConversationCut}>("/cuts", {
+		body: JSON.stringify({
+			position,
+			source_block_id: sourceBlockId,
+		}),
+		method: "POST",
+	});
+
+	return response.cut;
+}
+
+export async function removeAlienHandRefinementCut(
+	cutId: string
+): Promise<AlienHandConversationCut> {
+	const response = await fetchAlienHandRefinement<{cut: AlienHandConversationCut}>(
+		`/cuts/${encodeURIComponent(cutId)}`,
+		{method: "DELETE"}
+	);
+
+	return response.cut;
+}
+
+export async function createAlienHandRefinementChapter(
+	title: string,
+	summary: string,
+	cutIds: string[]
+): Promise<AlienHandConversationChapter> {
+	const response = await fetchAlienHandRefinement<{chapter: AlienHandConversationChapter}>(
+		"/chapters",
+		{
+			body: JSON.stringify({
+				cut_ids: cutIds,
+				summary,
+				title,
+			}),
+			method: "POST",
+		}
+	);
+
+	return response.chapter;
+}
+
+async function fetchAlienHandRefinement<T>(path: string, init: RequestInit = {}): Promise<T> {
+	const resolverBase = getAlienHandPayloadResolverBase();
+
+	if (!resolverBase) {
+		throw new Error("AlienHand payload resolver is not configured");
+	}
+
+	const headers = new Headers(init.headers);
+	headers.set("Accept", "application/json");
+
+	if (init.body && !headers.has("Content-Type")) {
+		headers.set("Content-Type", "application/json");
+	}
+
+	const resolverToken = getAlienHandPayloadResolverToken();
+
+	if (resolverToken) {
+		headers.set("Authorization", `Bearer ${resolverToken}`);
+	}
+
+	const response = await fetch(`${resolverBase}/alienhand/refinement${path}`, {
+		...init,
+		credentials: "omit",
+		headers,
+	});
+
+	if (!response.ok) {
+		throw new Error(`AlienHand refinement API returned ${response.status}`);
+	}
+
+	return (await response.json()) as T;
 }
 
 function buildAlienHandStatusRow(
