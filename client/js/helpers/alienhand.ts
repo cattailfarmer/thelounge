@@ -5,6 +5,9 @@ const ENVELOPE_PROTOCOL = "AH1";
 const RESOLVER_STORAGE_KEY = "alienhandPayloadResolver";
 const RESOLVER_TOKEN_STORAGE_KEY = "alienhandPayloadResolverToken";
 
+export type AlienHandRefinementTargetType = "block" | "cut" | "chapter";
+export type AlienHandStickyTargetType = AlienHandRefinementTargetType | "bookmark";
+
 type AlienHandEnvelope = {
 	appId: string;
 	channelUuid: string;
@@ -47,13 +50,31 @@ export type AlienHandConversationChapter = {
 
 export type AlienHandConversationBookmark = {
 	bookmark_id: string;
-	target_type: "block" | "cut" | "chapter";
+	target_type: AlienHandRefinementTargetType;
 	target_id: string;
 	scope: string;
 	label: string;
 	note: string;
 	persistence: string;
 	promotion_state: string;
+};
+
+export type AlienHandConversationQuote = {
+	quote_id: string;
+	source_type: AlienHandRefinementTargetType;
+	source_id: string;
+	excerpt: string;
+	provenance: Record<string, unknown>;
+	display_mode: string;
+};
+
+export type AlienHandConversationSticky = {
+	sticky_id: string;
+	target_type: AlienHandStickyTargetType;
+	target_id: string;
+	visibility: string;
+	retention: string;
+	clear_state: string;
 };
 
 export type AlienHandRefinementSearchHit = {
@@ -259,7 +280,7 @@ export async function listAlienHandRefinementChapters(
 
 export async function listAlienHandRefinementBookmarks(
 	channelUuid: string,
-	targetType?: AlienHandConversationBookmark["target_type"]
+	targetType?: AlienHandRefinementTargetType
 ): Promise<AlienHandConversationBookmark[]> {
 	const targetTypeQuery = targetType ? `&target_type=${encodeURIComponent(targetType)}` : "";
 	const response = await fetchAlienHandRefinement<{bookmarks?: AlienHandConversationBookmark[]}>(
@@ -267,6 +288,30 @@ export async function listAlienHandRefinementBookmarks(
 	);
 
 	return response.bookmarks || [];
+}
+
+export async function listAlienHandRefinementQuotes(
+	channelUuid: string,
+	sourceType?: AlienHandRefinementTargetType
+): Promise<AlienHandConversationQuote[]> {
+	const sourceTypeQuery = sourceType ? `&source_type=${encodeURIComponent(sourceType)}` : "";
+	const response = await fetchAlienHandRefinement<{quotes?: AlienHandConversationQuote[]}>(
+		`/quotes?channel=${encodeURIComponent(channelUuid)}${sourceTypeQuery}`
+	);
+
+	return response.quotes || [];
+}
+
+export async function listAlienHandRefinementStickies(
+	channelUuid: string,
+	targetType?: AlienHandStickyTargetType
+): Promise<AlienHandConversationSticky[]> {
+	const targetTypeQuery = targetType ? `&target_type=${encodeURIComponent(targetType)}` : "";
+	const response = await fetchAlienHandRefinement<{stickies?: AlienHandConversationSticky[]}>(
+		`/stickies?channel=${encodeURIComponent(channelUuid)}${targetTypeQuery}`
+	);
+
+	return response.stickies || [];
 }
 
 export async function searchAlienHandRefinement(
@@ -326,7 +371,7 @@ export async function createAlienHandRefinementChapter(
 }
 
 export async function createAlienHandRefinementBookmark(
-	targetType: AlienHandConversationBookmark["target_type"],
+	targetType: AlienHandRefinementTargetType,
 	targetId: string,
 	label: string,
 	note: string
@@ -345,6 +390,46 @@ export async function createAlienHandRefinementBookmark(
 	);
 
 	return response.bookmark;
+}
+
+export async function createAlienHandRefinementQuote(
+	sourceType: AlienHandRefinementTargetType,
+	sourceId: string,
+	excerpt: string,
+	provenance: Record<string, unknown> = {}
+): Promise<AlienHandConversationQuote> {
+	const response = await fetchAlienHandRefinement<{quote: AlienHandConversationQuote}>(
+		"/quotes",
+		{
+			body: JSON.stringify({
+				excerpt,
+				provenance,
+				source_id: sourceId,
+				source_type: sourceType,
+			}),
+			method: "POST",
+		}
+	);
+
+	return response.quote;
+}
+
+export async function createAlienHandRefinementSticky(
+	targetType: AlienHandStickyTargetType,
+	targetId: string
+): Promise<AlienHandConversationSticky> {
+	const response = await fetchAlienHandRefinement<{sticky: AlienHandConversationSticky}>(
+		"/stickies",
+		{
+			body: JSON.stringify({
+				target_id: targetId,
+				target_type: targetType,
+			}),
+			method: "POST",
+		}
+	);
+
+	return response.sticky;
 }
 
 async function fetchAlienHandRefinement<T>(path: string, init: RequestInit = {}): Promise<T> {

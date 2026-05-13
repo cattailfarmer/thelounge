@@ -45,6 +45,10 @@
 							'alienhand-workbench__card--bookmarked':
 								targetBookmarks('block', block.block_id).length,
 						},
+						{
+							'alienhand-workbench__card--sticky':
+								targetStickies('block', block.block_id).length,
+						},
 					]"
 				>
 					<div class="alienhand-workbench__meta">
@@ -52,14 +56,41 @@
 						<time>{{ formatTimestamp(block.created_at) }}</time>
 					</div>
 					<p>{{ block.presentation }}</p>
+					<div v-if="targetStickies('block', block.block_id).length" class="alienhand-workbench__stickies">
+						Pinned reminder
+					</div>
 					<div v-if="targetBookmarks('block', block.block_id).length" class="alienhand-workbench__bookmarks">
-						<span
+						<div
 							v-for="bookmark in targetBookmarks('block', block.block_id)"
 							:key="bookmark.bookmark_id"
-							:title="bookmark.note"
+							:class="[
+								'alienhand-workbench__bookmark-chip',
+								{
+									'alienhand-workbench__bookmark-chip--sticky':
+										targetStickies('bookmark', bookmark.bookmark_id).length,
+								},
+							]"
 						>
 							Bookmark: {{ bookmark.note || bookmark.label || bookmark.bookmark_id }}
-						</span>
+							<span v-if="bookmark.note" class="alienhand-workbench__bookmark-popover">
+								{{ bookmark.note }}
+							</span>
+							<button
+								class="btn btn-sm"
+								:disabled="!canCreateSticky('bookmark', bookmark.bookmark_id)"
+								@click="createSticky('bookmark', bookmark.bookmark_id)"
+							>
+								Pin
+							</button>
+						</div>
+					</div>
+					<div v-if="targetQuotes('block', block.block_id).length" class="alienhand-workbench__quotes">
+						<blockquote
+							v-for="quote in targetQuotes('block', block.block_id)"
+							:key="quote.quote_id"
+						>
+							{{ quote.excerpt }}
+						</blockquote>
 					</div>
 					<div class="alienhand-workbench__actions">
 						<button
@@ -68,6 +99,13 @@
 							@click="createCut(block)"
 						>
 							Inject into cuts
+						</button>
+						<button
+							class="btn btn-sm"
+							:disabled="!canCreateSticky('block', block.block_id)"
+							@click="createSticky('block', block.block_id)"
+						>
+							Pin
 						</button>
 					</div>
 					<form
@@ -83,6 +121,21 @@
 							:disabled="!canCreateBookmark('block', block.block_id)"
 						>
 							Bookmark
+						</button>
+					</form>
+					<form
+						class="alienhand-workbench__quote-form"
+						@submit.prevent="createQuote('block', block.block_id)"
+					>
+						<input
+							v-model="quoteDrafts[quoteKey('block', block.block_id)]"
+							placeholder="Quote excerpt"
+						/>
+						<button
+							class="btn btn-sm"
+							:disabled="!canCreateQuote('block', block.block_id)"
+						>
+							Quote
 						</button>
 					</form>
 				</article>
@@ -106,6 +159,10 @@
 							'alienhand-workbench__card--bookmarked':
 								targetBookmarks('cut', cut.cut_id).length,
 						},
+						{
+							'alienhand-workbench__card--sticky':
+								targetStickies('cut', cut.cut_id).length,
+						},
 					]"
 				>
 					<div class="alienhand-workbench__meta">
@@ -119,14 +176,50 @@
 						</button>
 					</div>
 					<p>{{ blockById.get(cut.source_block_id)?.presentation || cut.source_block_id }}</p>
+					<div v-if="targetStickies('cut', cut.cut_id).length" class="alienhand-workbench__stickies">
+						Pinned reminder
+					</div>
 					<div v-if="targetBookmarks('cut', cut.cut_id).length" class="alienhand-workbench__bookmarks">
-						<span
+						<div
 							v-for="bookmark in targetBookmarks('cut', cut.cut_id)"
 							:key="bookmark.bookmark_id"
-							:title="bookmark.note"
+							:class="[
+								'alienhand-workbench__bookmark-chip',
+								{
+									'alienhand-workbench__bookmark-chip--sticky':
+										targetStickies('bookmark', bookmark.bookmark_id).length,
+								},
+							]"
 						>
 							Bookmark: {{ bookmark.note || bookmark.label || bookmark.bookmark_id }}
-						</span>
+							<span v-if="bookmark.note" class="alienhand-workbench__bookmark-popover">
+								{{ bookmark.note }}
+							</span>
+							<button
+								class="btn btn-sm"
+								:disabled="!canCreateSticky('bookmark', bookmark.bookmark_id)"
+								@click="createSticky('bookmark', bookmark.bookmark_id)"
+							>
+								Pin
+							</button>
+						</div>
+					</div>
+					<div v-if="targetQuotes('cut', cut.cut_id).length" class="alienhand-workbench__quotes">
+						<blockquote
+							v-for="quote in targetQuotes('cut', cut.cut_id)"
+							:key="quote.quote_id"
+						>
+							{{ quote.excerpt }}
+						</blockquote>
+					</div>
+					<div class="alienhand-workbench__actions">
+						<button
+							class="btn btn-sm"
+							:disabled="!canCreateSticky('cut', cut.cut_id)"
+							@click="createSticky('cut', cut.cut_id)"
+						>
+							Pin
+						</button>
 					</div>
 					<form
 						class="alienhand-workbench__bookmark-form"
@@ -141,6 +234,21 @@
 							:disabled="!canCreateBookmark('cut', cut.cut_id)"
 						>
 							Bookmark
+						</button>
+					</form>
+					<form
+						class="alienhand-workbench__quote-form"
+						@submit.prevent="createQuote('cut', cut.cut_id)"
+					>
+						<input
+							v-model="quoteDrafts[quoteKey('cut', cut.cut_id)]"
+							placeholder="Quote excerpt"
+						/>
+						<button
+							class="btn btn-sm"
+							:disabled="!canCreateQuote('cut', cut.cut_id)"
+						>
+							Quote
 						</button>
 					</form>
 				</article>
@@ -168,6 +276,10 @@
 							'alienhand-workbench__card--bookmarked':
 								targetBookmarks('chapter', chapter.chapter_id).length,
 						},
+						{
+							'alienhand-workbench__card--sticky':
+								targetStickies('chapter', chapter.chapter_id).length,
+						},
 					]"
 				>
 					<div class="alienhand-workbench__meta">
@@ -177,16 +289,58 @@
 					<h4>{{ chapter.title }}</h4>
 					<p>{{ chapter.summary || "No summary yet." }}</p>
 					<div
+						v-if="targetStickies('chapter', chapter.chapter_id).length"
+						class="alienhand-workbench__stickies"
+					>
+						Pinned reminder
+					</div>
+					<div
 						v-if="targetBookmarks('chapter', chapter.chapter_id).length"
 						class="alienhand-workbench__bookmarks"
 					>
-						<span
+						<div
 							v-for="bookmark in targetBookmarks('chapter', chapter.chapter_id)"
 							:key="bookmark.bookmark_id"
-							:title="bookmark.note"
+							:class="[
+								'alienhand-workbench__bookmark-chip',
+								{
+									'alienhand-workbench__bookmark-chip--sticky':
+										targetStickies('bookmark', bookmark.bookmark_id).length,
+								},
+							]"
 						>
 							Bookmark: {{ bookmark.note || bookmark.label || bookmark.bookmark_id }}
-						</span>
+							<span v-if="bookmark.note" class="alienhand-workbench__bookmark-popover">
+								{{ bookmark.note }}
+							</span>
+							<button
+								class="btn btn-sm"
+								:disabled="!canCreateSticky('bookmark', bookmark.bookmark_id)"
+								@click="createSticky('bookmark', bookmark.bookmark_id)"
+							>
+								Pin
+							</button>
+						</div>
+					</div>
+					<div
+						v-if="targetQuotes('chapter', chapter.chapter_id).length"
+						class="alienhand-workbench__quotes"
+					>
+						<blockquote
+							v-for="quote in targetQuotes('chapter', chapter.chapter_id)"
+							:key="quote.quote_id"
+						>
+							{{ quote.excerpt }}
+						</blockquote>
+					</div>
+					<div class="alienhand-workbench__actions">
+						<button
+							class="btn btn-sm"
+							:disabled="!canCreateSticky('chapter', chapter.chapter_id)"
+							@click="createSticky('chapter', chapter.chapter_id)"
+						>
+							Pin
+						</button>
 					</div>
 					<form
 						class="alienhand-workbench__bookmark-form"
@@ -201,6 +355,21 @@
 							:disabled="!canCreateBookmark('chapter', chapter.chapter_id)"
 						>
 							Bookmark
+						</button>
+					</form>
+					<form
+						class="alienhand-workbench__quote-form"
+						@submit.prevent="createQuote('chapter', chapter.chapter_id)"
+					>
+						<input
+							v-model="quoteDrafts[quoteKey('chapter', chapter.chapter_id)]"
+							placeholder="Quote excerpt"
+						/>
+						<button
+							class="btn btn-sm"
+							:disabled="!canCreateQuote('chapter', chapter.chapter_id)"
+						>
+							Quote
 						</button>
 					</form>
 				</article>
@@ -225,19 +394,25 @@ import {
 	createAlienHandRefinementBookmark,
 	createAlienHandRefinementChapter,
 	createAlienHandRefinementCut,
+	createAlienHandRefinementQuote,
+	createAlienHandRefinementSticky,
 	listAlienHandRefinementBlocks,
 	listAlienHandRefinementBookmarks,
 	listAlienHandRefinementChapters,
 	listAlienHandRefinementCuts,
+	listAlienHandRefinementQuotes,
+	listAlienHandRefinementStickies,
 	removeAlienHandRefinementCut,
 	searchAlienHandRefinement,
 	type AlienHandConversationBookmark,
 	type AlienHandConversationBlock,
 	type AlienHandConversationChapter,
 	type AlienHandConversationCut,
+	type AlienHandConversationQuote,
+	type AlienHandConversationSticky,
+	type AlienHandRefinementTargetType,
+	type AlienHandStickyTargetType,
 } from "../js/helpers/alienhand";
-
-type BookmarkTargetType = AlienHandConversationBookmark["target_type"];
 
 export default defineComponent({
 	name: "AlienHandRefinementWorkbench",
@@ -249,12 +424,17 @@ export default defineComponent({
 		const cuts = ref<AlienHandConversationCut[]>([]);
 		const chapters = ref<AlienHandConversationChapter[]>([]);
 		const bookmarks = ref<AlienHandConversationBookmark[]>([]);
+		const quotes = ref<AlienHandConversationQuote[]>([]);
+		const stickies = ref<AlienHandConversationSticky[]>([]);
 		const bookmarkDrafts = ref<Record<string, string>>({});
+		const quoteDrafts = ref<Record<string, string>>({});
 		const loading = ref(false);
 		const error = ref("");
 		const pendingBlockId = ref("");
 		const pendingCutId = ref("");
 		const pendingBookmarkKey = ref("");
+		const pendingQuoteKey = ref("");
+		const pendingStickyKey = ref("");
 		const searchTerm = ref("");
 		const searchHitBlockIds = ref(new Set<string>());
 		const chapterTitle = ref("");
@@ -269,15 +449,43 @@ export default defineComponent({
 		const blockById = computed(
 			() => new Map(blocks.value.map((block) => [block.block_id, block]))
 		);
-		const bookmarkKey = (targetType: BookmarkTargetType, targetId: string) =>
+		const targetKey = (targetType: string, targetId: string) =>
 			`${targetType}:${targetId}`;
+		const bookmarkKey = (targetType: AlienHandRefinementTargetType, targetId: string) =>
+			targetKey(targetType, targetId);
+		const quoteKey = (sourceType: AlienHandRefinementTargetType, sourceId: string) =>
+			targetKey(sourceType, sourceId);
 		const bookmarksByTarget = computed(() => {
 			const grouped = new Map<string, AlienHandConversationBookmark[]>();
 
 			for (const bookmark of bookmarks.value) {
-				const key = bookmarkKey(bookmark.target_type, bookmark.target_id);
+				const key = targetKey(bookmark.target_type, bookmark.target_id);
 				const group = grouped.get(key) || [];
 				group.push(bookmark);
+				grouped.set(key, group);
+			}
+
+			return grouped;
+		});
+		const quotesBySource = computed(() => {
+			const grouped = new Map<string, AlienHandConversationQuote[]>();
+
+			for (const quote of quotes.value) {
+				const key = targetKey(quote.source_type, quote.source_id);
+				const group = grouped.get(key) || [];
+				group.push(quote);
+				grouped.set(key, group);
+			}
+
+			return grouped;
+		});
+		const stickiesByTarget = computed(() => {
+			const grouped = new Map<string, AlienHandConversationSticky[]>();
+
+			for (const sticky of stickies.value) {
+				const key = targetKey(sticky.target_type, sticky.target_id);
+				const group = grouped.get(key) || [];
+				group.push(sticky);
 				grouped.set(key, group);
 			}
 
@@ -290,6 +498,8 @@ export default defineComponent({
 					bookmarks: bookmarks.value,
 					chapters: chapters.value,
 					cuts: cuts.value,
+					quotes: quotes.value,
+					stickies: stickies.value,
 				},
 				null,
 				2
@@ -305,17 +515,21 @@ export default defineComponent({
 			error.value = "";
 
 			try {
-				const [nextBlocks, nextCuts, nextChapters, nextBookmarks] = await Promise.all([
+				const [nextBlocks, nextCuts, nextChapters, nextBookmarks, nextQuotes, nextStickies] = await Promise.all([
 					listAlienHandRefinementBlocks(channelUuid.value),
 					listAlienHandRefinementCuts(channelUuid.value),
 					listAlienHandRefinementChapters(channelUuid.value),
 					listAlienHandRefinementBookmarks(channelUuid.value),
+					listAlienHandRefinementQuotes(channelUuid.value),
+					listAlienHandRefinementStickies(channelUuid.value),
 				]);
 
 				blocks.value = nextBlocks;
 				cuts.value = nextCuts;
 				chapters.value = nextChapters;
 				bookmarks.value = nextBookmarks;
+				quotes.value = nextQuotes;
+				stickies.value = nextStickies;
 			} catch (caught) {
 				error.value = caught instanceof Error ? caught.message : String(caught);
 			} finally {
@@ -401,15 +615,31 @@ export default defineComponent({
 			}
 		};
 
-		const targetBookmarks = (targetType: BookmarkTargetType, targetId: string) =>
+		const targetBookmarks = (targetType: AlienHandRefinementTargetType, targetId: string) =>
 			bookmarksByTarget.value.get(bookmarkKey(targetType, targetId)) || [];
 
-		const canCreateBookmark = (targetType: BookmarkTargetType, targetId: string) => {
+		const targetQuotes = (sourceType: AlienHandRefinementTargetType, sourceId: string) =>
+			quotesBySource.value.get(quoteKey(sourceType, sourceId)) || [];
+
+		const targetStickies = (targetType: AlienHandStickyTargetType, targetId: string) =>
+			stickiesByTarget.value.get(targetKey(targetType, targetId)) || [];
+
+		const canCreateBookmark = (targetType: AlienHandRefinementTargetType, targetId: string) => {
 			const key = bookmarkKey(targetType, targetId);
 			return Boolean(bookmarkDrafts.value[key]?.trim()) && pendingBookmarkKey.value !== key;
 		};
 
-		const createBookmark = async (targetType: BookmarkTargetType, targetId: string) => {
+		const canCreateQuote = (sourceType: AlienHandRefinementTargetType, sourceId: string) => {
+			const key = quoteKey(sourceType, sourceId);
+			return Boolean(quoteDrafts.value[key]?.trim()) && pendingQuoteKey.value !== key;
+		};
+
+		const canCreateSticky = (targetType: AlienHandStickyTargetType, targetId: string) => {
+			const key = targetKey(targetType, targetId);
+			return !targetStickies(targetType, targetId).length && pendingStickyKey.value !== key;
+		};
+
+		const createBookmark = async (targetType: AlienHandRefinementTargetType, targetId: string) => {
 			const key = bookmarkKey(targetType, targetId);
 			const note = bookmarkDrafts.value[key]?.trim() || "";
 
@@ -432,6 +662,48 @@ export default defineComponent({
 			}
 		};
 
+		const createQuote = async (sourceType: AlienHandRefinementTargetType, sourceId: string) => {
+			const key = quoteKey(sourceType, sourceId);
+			const excerpt = quoteDrafts.value[key]?.trim() || "";
+
+			if (!excerpt) {
+				error.value = "Add an excerpt before creating a quote.";
+				return;
+			}
+
+			pendingQuoteKey.value = key;
+			error.value = "";
+
+			try {
+				await createAlienHandRefinementQuote(sourceType, sourceId, excerpt, {
+					channel_uuid: channelUuid.value,
+					source_id: sourceId,
+					source_type: sourceType,
+				});
+				delete quoteDrafts.value[key];
+				await refresh();
+			} catch (caught) {
+				error.value = caught instanceof Error ? caught.message : String(caught);
+			} finally {
+				pendingQuoteKey.value = "";
+			}
+		};
+
+		const createSticky = async (targetType: AlienHandStickyTargetType, targetId: string) => {
+			const key = targetKey(targetType, targetId);
+			pendingStickyKey.value = key;
+			error.value = "";
+
+			try {
+				await createAlienHandRefinementSticky(targetType, targetId);
+				await refresh();
+			} catch (caught) {
+				error.value = caught instanceof Error ? caught.message : String(caught);
+			} finally {
+				pendingStickyKey.value = "";
+			}
+		};
+
 		const formatTimestamp = (value: string) => {
 			const timestamp = Date.parse(value);
 
@@ -449,7 +721,10 @@ export default defineComponent({
 				cuts.value = [];
 				chapters.value = [];
 				bookmarks.value = [];
+				quotes.value = [];
+				stickies.value = [];
 				bookmarkDrafts.value = {};
+				quoteDrafts.value = {};
 				searchHitBlockIds.value = new Set();
 				await refresh();
 			},
@@ -464,6 +739,8 @@ export default defineComponent({
 			bookmarks,
 			blocks,
 			canCreateBookmark,
+			canCreateQuote,
+			canCreateSticky,
 			channelUuid,
 			chapterSummary,
 			chapterTitle,
@@ -471,12 +748,17 @@ export default defineComponent({
 			createBookmark,
 			createChapter,
 			createCut,
+			createQuote,
+			createSticky,
 			cuts,
 			error,
 			formatTimestamp,
 			loading,
 			pendingBlockId,
 			pendingCutId,
+			quoteDrafts,
+			quoteKey,
+			quotes,
 			rawDebugText,
 			refresh,
 			removeCut,
@@ -487,7 +769,10 @@ export default defineComponent({
 			showEditsPane,
 			showRawPane,
 			showRawText,
+			stickies,
 			targetBookmarks,
+			targetQuotes,
+			targetStickies,
 		};
 	},
 });
