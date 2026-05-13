@@ -21,6 +21,32 @@
 
 		<p v-if="error" class="alienhand-workbench__error">{{ error }}</p>
 
+		<div
+			v-if="selectedSourceBlock"
+			class="alienhand-workbench__source-bridge"
+			aria-label="Selected source message for cuts"
+		>
+			<button
+				class="alienhand-workbench__source-arrow"
+				:disabled="pendingBlockId === selectedSourceBlock.block_id"
+				title="Insert selected message into cuts"
+				@click="insertSelectedSource"
+			>
+				&rarr;
+			</button>
+			<div class="alienhand-workbench__source-bubble">
+				<strong>@{{ selectedSourceBlock.sender }}</strong>
+				<span>{{ selectedSourceBlock.presentation }}</span>
+				<button
+					class="alienhand-workbench__remove"
+					title="Clear selected source"
+					@click="selectedSourceBlock = null"
+				>
+					x
+				</button>
+			</div>
+		</div>
+
 		<form class="alienhand-workbench__search" @submit.prevent="runSearch">
 			<input v-model="searchTerm" placeholder="Search raw blocks" />
 			<button class="btn btn-sm" :disabled="loading || !searchTerm.trim()">Search</button>
@@ -162,7 +188,9 @@
 					<h3>Cuts</h3>
 					<span>{{ activeCuts.length }} active</span>
 				</header>
-				<p class="alienhand-workbench__pointer">Insertion pointer: end of cuts</p>
+				<p class="alienhand-workbench__pointer">
+					Select a live chat line with its arrow, then use the bridge arrow to insert it here.
+				</p>
 				<p v-if="!activeCuts.length" class="alienhand-workbench__empty">
 					Use "Inject into cuts" on a raw block to start composing.
 				</p>
@@ -481,12 +509,14 @@
 </template>
 
 <script lang="ts">
-import {computed, defineComponent, PropType, ref, watch} from "vue";
+import {computed, defineComponent, onBeforeUnmount, onMounted, PropType, ref, watch} from "vue";
 
 import type {ClientChan} from "../js/types";
+import eventbus from "../js/eventbus";
 import {
 	alienHandChannelUuidFromName,
 	createAlienHandRefinementBookmark,
+	createAlienHandRefinementBlock,
 	createAlienHandRefinementChapter,
 	createAlienHandRefinementCut,
 	createAlienHandRefinementEdit,
@@ -507,6 +537,7 @@ import {
 	searchAlienHandRefinement,
 	type AlienHandConversationBookmark,
 	type AlienHandConversationBlock,
+	type AlienHandConversationBlockInput,
 	type AlienHandConversationChapter,
 	type AlienHandConversationCut,
 	type AlienHandConversationEdit,
@@ -533,6 +564,7 @@ export default defineComponent({
 		const edits = ref<AlienHandConversationEdit[]>([]);
 		const editDiffs = ref<AlienHandConversationEditDiff[]>([]);
 		const tocEntries = ref<AlienHandConversationTocEntry[]>([]);
+		const selectedSourceBlock = ref<AlienHandConversationBlockInput | null>(null);
 		const bookmarkDrafts = ref<Record<string, string>>({});
 		const quoteDrafts = ref<Record<string, string>>({});
 		const editDrafts = ref<Record<string, string>>({});
@@ -549,7 +581,7 @@ export default defineComponent({
 		const searchHitBlockIds = ref(new Set<string>());
 		const chapterTitle = ref("");
 		const chapterSummary = ref("");
-		const showRawPane = ref(true);
+		const showRawPane = ref(false);
 		const showCutsPane = ref(true);
 		const showEditsPane = ref(true);
 		const showRawText = ref(false);
@@ -716,6 +748,29 @@ export default defineComponent({
 
 			try {
 				await createAlienHandRefinementCut(block.block_id);
+				await refresh();
+			} catch (caught) {
+				error.value = caught instanceof Error ? caught.message : String(caught);
+			} finally {
+				pendingBlockId.value = "";
+			}
+		};
+
+		const insertSelectedSource = async () => {
+			const sourceBlock = selectedSourceBlock.value;
+
+			if (!sourceBlock) {
+				error.value = "Select a live chat line before inserting into cuts.";
+				return;
+			}
+
+			pendingBlockId.value = sourceBlock.block_id;
+			error.value = "";
+
+			try {
+				const storedBlock = await createAlienHandRefinementBlock(sourceBlock);
+				await createAlienHandRefinementCut(storedBlock.block_id, activeCuts.value.length);
+				selectedSourceBlock.value = null;
 				await refresh();
 			} catch (caught) {
 				error.value = caught instanceof Error ? caught.message : String(caught);
@@ -980,6 +1035,22 @@ export default defineComponent({
 
 		const formatJson = (value: unknown) => JSON.stringify(value, null, 2);
 
+		const onSourceMessageSelected = (block: AlienHandConversationBlockInput) => {
+			if (block.channel_uuid !== channelUuid.value) {
+				return;
+			}
+
+			selectedSourceBlock.value = block;
+		};
+
+		onMounted(() => {
+			eventbus.on("alienhand:source-message:selected", onSourceMessageSelected);
+		});
+
+		onBeforeUnmount(() => {
+			eventbus.off("alienhand:source-message:selected", onSourceMessageSelected);
+		});
+
 		watch(
 			channelUuid,
 			async () => {
@@ -992,6 +1063,7 @@ export default defineComponent({
 				edits.value = [];
 				editDiffs.value = [];
 				tocEntries.value = [];
+				selectedSourceBlock.value = null;
 				bookmarkDrafts.value = {};
 				quoteDrafts.value = {};
 				editDrafts.value = {};
@@ -1035,6 +1107,7 @@ export default defineComponent({
 			firstSticky,
 			formatJson,
 			formatTimestamp,
+			insertSelectedSource,
 			loading,
 			pendingBlockId,
 			pendingCutId,
@@ -1051,6 +1124,7 @@ export default defineComponent({
 			runSearch,
 			searchHitBlockIds,
 			searchTerm,
+			selectedSourceBlock,
 			showCutsPane,
 			showEditsPane,
 			showRawPane,

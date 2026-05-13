@@ -19,6 +19,15 @@
 			class="time tooltipped tooltipped-e"
 			>{{ `${messageTime}&#32;` }}
 		</span>
+		<button
+			v-if="alienHandSourceAvailable"
+			class="alienhand-source-arrow"
+			type="button"
+			title="Stage this message for cuts"
+			@click.stop="selectAlienHandSource"
+		>
+			&rarr;
+		</button>
 		<template v-if="message.alienhand">
 			<AlienHandMessage :row="message.alienhand" />
 		</template>
@@ -101,6 +110,8 @@ import {computed, defineComponent, PropType} from "vue";
 import dayjs from "dayjs";
 
 import constants from "../js/constants";
+import eventbus from "../js/eventbus";
+import {alienHandChannelUuidFromName, type AlienHandConversationBlockInput} from "../js/helpers/alienhand";
 import localetime from "../js/helpers/localetime";
 import Username from "./Username.vue";
 import LinkPreview from "./LinkPreview.vue";
@@ -154,6 +165,32 @@ export default defineComponent({
 			return localetime(props.message.time);
 		});
 
+		const alienHandChannelUuid = computed(() =>
+			alienHandChannelUuidFromName(props.channel?.name)
+		);
+
+		const alienHandPresentation = computed(() => {
+			const alienHandText = props.message.alienhand?.content?.text;
+
+			if (typeof alienHandText === "string" && alienHandText.trim()) {
+				return alienHandText;
+			}
+
+			if (props.message.text?.trim()) {
+				return props.message.text;
+			}
+
+			if (props.message.params?.length) {
+				return props.message.params.join(" ");
+			}
+
+			return props.message.command || "";
+		});
+
+		const alienHandSourceAvailable = computed(
+			() => Boolean(alienHandChannelUuid.value) && Boolean(alienHandPresentation.value.trim())
+		);
+
 		const messageComponent = computed(() => {
 			return "message-" + (props.message.type || "invalid"); // TODO: force existence of type in sharedmsg
 		});
@@ -166,12 +203,46 @@ export default defineComponent({
 			return typeof MessageTypes["message-" + props.message.type] !== "undefined";
 		};
 
+		const selectAlienHandSource = () => {
+			const channelUuid = alienHandChannelUuid.value;
+
+			if (!channelUuid) {
+				return;
+			}
+
+			const createdAt = new Date(props.message.time).toISOString();
+			const block: AlienHandConversationBlockInput = {
+				block_id: `thelounge:${channelUuid}:${props.message.id}`,
+				channel_uuid: channelUuid,
+				created_at: createdAt,
+				message_uuid: `thelounge-${channelUuid}-${props.message.id}`,
+				metadata: {
+					channel_id: props.channel?.id,
+					source: "thelounge_live_chat",
+				},
+				payload_kind: props.message.alienhand?.payload_kind || "irc_text",
+				presentation: alienHandPresentation.value,
+				raw_refs: [
+					{
+						kind: "thelounge_message",
+						message_id: props.message.id,
+					},
+				],
+				sender: props.message.alienhand?.sender || props.message.from?.nick || "unknown",
+				sender_type: props.message.alienhand?.sender_type || "user",
+			};
+
+			eventbus.emit("alienhand:source-message:selected", block);
+		};
+
 		return {
+			alienHandSourceAvailable,
 			timeFormat,
 			messageTime,
 			messageTimeLocale,
 			messageComponent,
 			isAction,
+			selectAlienHandSource,
 		};
 	},
 });

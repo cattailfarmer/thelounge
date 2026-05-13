@@ -29,6 +29,8 @@ export type AlienHandConversationBlock = {
 	metadata?: Record<string, unknown>;
 };
 
+export type AlienHandConversationBlockInput = AlienHandConversationBlock;
+
 export type AlienHandConversationCut = {
 	cut_id: string;
 	source_block_id: string;
@@ -387,6 +389,20 @@ export async function searchAlienHandRefinement(
 	);
 
 	return response.hits || [];
+}
+
+export async function createAlienHandRefinementBlock(
+	block: AlienHandConversationBlockInput
+): Promise<AlienHandConversationBlock> {
+	const response = await fetchAlienHandRefinement<{block: AlienHandConversationBlock}>(
+		"/blocks",
+		{
+			body: JSON.stringify(block),
+			method: "POST",
+		}
+	);
+
+	return response.block;
 }
 
 export async function createAlienHandRefinementCut(
