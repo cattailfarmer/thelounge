@@ -5,6 +5,7 @@ import {switchToChannel} from "../router";
 import {ClientChan, NetChan, ClientMessage} from "../types";
 import {SharedMsg, MessageType} from "../../../shared/types/msg";
 import {ChanType} from "../../../shared/types/chan";
+import {resolveAlienHandMessage} from "../helpers/alienhand";
 
 let pop;
 
@@ -67,6 +68,7 @@ socket.on("msg", function (data) {
 	}
 
 	channel.messages.push(data.msg);
+	void resolveAlienHandMessage(channel.messages[channel.messages.length - 1]);
 
 	if (data.msg.self) {
 		channel.firstUnread = data.msg.id;
