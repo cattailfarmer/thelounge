@@ -59,9 +59,41 @@ export type LinkPreview = {
 	thumbActualUrl?: string;
 };
 
+export type AlienHandRenderFrame = {
+	index: number;
+	kind: string;
+	text?: string;
+	source?: string;
+	alt?: string;
+	label?: string;
+	mime_type?: string;
+	content?: Record<string, unknown>;
+	metadata?: Record<string, unknown>;
+};
+
+export type AlienHandRenderRow = {
+	message_uuid: string;
+	channel_uuid?: string;
+	sender: string;
+	sender_type: string;
+	event_type: string;
+	payload_kind: string;
+	created_at?: string;
+	orientation: "left" | "right" | "system";
+	status: string;
+	content: {
+		text?: string;
+		reason?: string;
+		[key: string]: unknown;
+	};
+	frames: AlienHandRenderFrame[];
+	metadata?: Record<string, unknown>;
+};
+
 export type SharedMsg = {
 	from?: UserInMessage;
 	id: number;
+	alienhand?: AlienHandRenderRow;
 	msgid?: string;
 	previews?: LinkPreview[];
 	text?: string;

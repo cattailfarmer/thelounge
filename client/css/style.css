@@ -1,5 +1,6 @@
 @import "../../node_modules/normalize.css/normalize.css";
 @import "fontawesome.css";
+@import "alienhand-chat.css";
 @import "../../node_modules/primer-tooltips/build/build.css";
 
 /* Allow tooltips via data-tooltip instead of aria-label to avoid

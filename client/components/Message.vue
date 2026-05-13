@@ -19,7 +19,10 @@
 			class="time tooltipped tooltipped-e"
 			>{{ `${messageTime}&#32;` }}
 		</span>
-		<template v-if="message.type === 'unhandled'">
+		<template v-if="message.alienhand">
+			<AlienHandMessage :row="message.alienhand" />
+		</template>
+		<template v-else-if="message.type === 'unhandled'">
 			<span class="from">[{{ message.command }}]</span>
 			<span class="content">
 				<span v-for="(param, id) in message.params" :key="id">{{
@@ -104,6 +107,7 @@ import LinkPreview from "./LinkPreview.vue";
 import ParsedMessage from "./ParsedMessage.vue";
 import MessageTypes from "./MessageTypes";
 import StatusmsgMarker from "./StatusmsgMarker.vue";
+import AlienHandMessage from "./AlienHandMessage.vue";
 
 import type {ClientChan, ClientMessage, ClientNetwork} from "../js/types";
 import {useStore} from "../js/store";
@@ -116,6 +120,7 @@ export default defineComponent({
 	name: "Message",
 	components: {
 		...MessageTypes,
+		AlienHandMessage,
 		StatusmsgMarker,
 	},
 	props: {
