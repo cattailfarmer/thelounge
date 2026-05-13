@@ -43,6 +43,9 @@ export type AlienHandConversationChapter = {
 	summary: string;
 	member_cut_ids: string[];
 	member_block_ids: string[];
+	bookmarks?: string[];
+	quotes?: string[];
+	edit_chain?: string[];
 	created_at: string;
 	updated_at: string;
 	provenance?: Record<string, unknown>;
@@ -75,6 +78,34 @@ export type AlienHandConversationSticky = {
 	visibility: string;
 	retention: string;
 	clear_state: string;
+};
+
+export type AlienHandConversationEdit = {
+	edit_id: string;
+	input_ref: Record<string, unknown>;
+	output_ref: Record<string, unknown>;
+	edit_type: string;
+	reason: string;
+	author: string;
+	diff_id: string;
+};
+
+export type AlienHandConversationEditDiff = {
+	diff_id: string;
+	edit_id: string;
+	source_ref: Record<string, unknown>;
+	diff_format: string;
+	diff_uri: string;
+	content: Record<string, unknown>;
+};
+
+export type AlienHandConversationTocEntry = {
+	toc_id: string;
+	ordinal: number;
+	entry_type: string;
+	target_id: string;
+	title: string;
+	source_scope: Record<string, unknown>;
 };
 
 export type AlienHandRefinementSearchHit = {
@@ -316,6 +347,38 @@ export async function listAlienHandRefinementStickies(
 	return response.stickies || [];
 }
 
+export async function listAlienHandRefinementEdits(
+	editType?: string
+): Promise<AlienHandConversationEdit[]> {
+	const editTypeQuery = editType ? `?edit_type=${encodeURIComponent(editType)}` : "";
+	const response = await fetchAlienHandRefinement<{edits?: AlienHandConversationEdit[]}>(
+		`/edits${editTypeQuery}`
+	);
+
+	return response.edits || [];
+}
+
+export async function listAlienHandRefinementEditDiffs(
+	editId?: string
+): Promise<AlienHandConversationEditDiff[]> {
+	const editIdQuery = editId ? `?edit_id=${encodeURIComponent(editId)}` : "";
+	const response = await fetchAlienHandRefinement<{diffs?: AlienHandConversationEditDiff[]}>(
+		`/edit-diffs${editIdQuery}`
+	);
+
+	return response.diffs || [];
+}
+
+export async function listAlienHandRefinementToc(
+	tocId = "main"
+): Promise<AlienHandConversationTocEntry[]> {
+	const response = await fetchAlienHandRefinement<{
+		entries?: AlienHandConversationTocEntry[];
+	}>(`/toc?toc_id=${encodeURIComponent(tocId)}`);
+
+	return response.entries || [];
+}
+
 export async function searchAlienHandRefinement(
 	query: string
 ): Promise<AlienHandRefinementSearchHit[]> {
@@ -443,6 +506,56 @@ export async function removeAlienHandRefinementSticky(
 	);
 
 	return response.sticky;
+}
+
+export async function createAlienHandRefinementEdit(
+	inputRef: Record<string, unknown>,
+	outputRef: Record<string, unknown>,
+	editType: string,
+	reason: string,
+	diffContent: Record<string, unknown>,
+	author = "thelounge-user"
+): Promise<{edit: AlienHandConversationEdit; diff: AlienHandConversationEditDiff}> {
+	return fetchAlienHandRefinement<{edit: AlienHandConversationEdit; diff: AlienHandConversationEditDiff}>(
+		"/edits",
+		{
+			body: JSON.stringify({
+				author,
+				diff_content: diffContent,
+				edit_type: editType,
+				input_ref: inputRef,
+				output_ref: outputRef,
+				reason,
+			}),
+			method: "POST",
+		}
+	);
+}
+
+export async function createAlienHandRefinementTocEntry(
+	tocId: string,
+	ordinal: number,
+	entryType: string,
+	targetId: string,
+	title: string,
+	sourceScope: Record<string, unknown> = {}
+): Promise<AlienHandConversationTocEntry> {
+	const response = await fetchAlienHandRefinement<{entry: AlienHandConversationTocEntry}>(
+		"/toc",
+		{
+			body: JSON.stringify({
+				entry_type: entryType,
+				ordinal,
+				source_scope: sourceScope,
+				target_id: targetId,
+				title,
+				toc_id: tocId,
+			}),
+			method: "POST",
+		}
+	);
+
+	return response.entry;
 }
 
 async function fetchAlienHandRefinement<T>(path: string, init: RequestInit = {}): Promise<T> {

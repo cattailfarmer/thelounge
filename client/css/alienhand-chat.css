@@ -199,7 +199,8 @@
 
 #chat .alienhand-workbench__search input,
 #chat .alienhand-workbench__chapter-form input,
-#chat .alienhand-workbench__chapter-form textarea {
+#chat .alienhand-workbench__chapter-form textarea,
+#chat .alienhand-workbench__edit-form textarea {
 	background: #fff;
 	border: 1px solid var(--alienhand-border);
 	border-radius: 6px;
@@ -298,6 +299,13 @@
 	margin-top: 0.5rem;
 }
 
+#chat .alienhand-workbench__edit-form {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+	margin-top: 0.5rem;
+}
+
 #chat .alienhand-workbench__bookmark-form input,
 #chat .alienhand-workbench__quote-form input {
 	background: #fff;
@@ -392,6 +400,60 @@
 	font-weight: 700;
 	gap: 0.35rem;
 	padding: 0.2rem 0.5rem;
+}
+
+#chat .alienhand-workbench__toc {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	margin-top: 0.45rem;
+}
+
+#chat .alienhand-workbench__toc span {
+	background: #e7f3d4;
+	border: 1px solid #9cb96e;
+	border-radius: 999px;
+	color: #40551d;
+	font-size: 0.72rem;
+	font-weight: 700;
+	padding: 0.25rem 0.5rem;
+}
+
+#chat .alienhand-workbench__edits {
+	display: flex;
+	flex-direction: column;
+	gap: 0.45rem;
+	margin-top: 0.5rem;
+}
+
+#chat .alienhand-workbench__edits section {
+	background: #eef5f1;
+	border: 1px solid #b8cbc2;
+	border-radius: 8px;
+	padding: 0.45rem;
+}
+
+#chat .alienhand-workbench__edits section > div {
+	align-items: center;
+	display: flex;
+	justify-content: space-between;
+}
+
+#chat .alienhand-workbench__edits span {
+	color: var(--alienhand-muted);
+	font-size: 0.72rem;
+}
+
+#chat .alienhand-workbench__edits pre {
+	background: var(--alienhand-code-bg);
+	border-radius: 6px;
+	color: var(--alienhand-code-text);
+	font-size: 0.72rem;
+	margin: 0.4rem 0 0;
+	max-height: 10rem;
+	overflow: auto;
+	padding: 0.45rem;
+	white-space: pre-wrap;
 }
 
 #chat .alienhand-workbench__chapter-form {

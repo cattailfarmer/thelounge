@@ -294,7 +294,7 @@
 			<section v-if="showEditsPane" class="alienhand-workbench__pane">
 				<header>
 					<h3>Edits</h3>
-					<span>{{ chapters.length }} chapters</span>
+					<span>{{ chapters.length }} chapters / {{ edits.length }} edits</span>
 				</header>
 				<p v-if="!chapters.length" class="alienhand-workbench__empty">
 					Chapters created from cuts will appear here.
@@ -320,6 +320,30 @@
 					</div>
 					<h4>{{ chapter.title }}</h4>
 					<p>{{ chapter.summary || "No summary yet." }}</p>
+					<div
+						v-if="tocEntriesForTarget('chapter', chapter.chapter_id).length"
+						class="alienhand-workbench__toc"
+					>
+						<span
+							v-for="entry in tocEntriesForTarget('chapter', chapter.chapter_id)"
+							:key="`${entry.toc_id}:${entry.ordinal}`"
+						>
+							TOC {{ entry.ordinal + 1 }}: {{ entry.title }}
+						</span>
+					</div>
+					<div v-if="chapterEdits(chapter).length" class="alienhand-workbench__edits">
+						<section v-for="edit in chapterEdits(chapter)" :key="edit.edit_id">
+							<div>
+								<strong>{{ edit.edit_type }}</strong>
+								<span>{{ edit.author }}</span>
+							</div>
+							<p>{{ edit.reason || "No edit reason recorded." }}</p>
+							<pre
+								v-for="diff in editDiffsForEdit(edit.edit_id)"
+								:key="diff.diff_id"
+							>{{ formatJson(diff.content) }}</pre>
+						</section>
+					</div>
 					<div
 						v-if="targetStickies('chapter', chapter.chapter_id).length"
 						class="alienhand-workbench__stickies"
@@ -389,6 +413,13 @@
 						>
 							Pin
 						</button>
+						<button
+							class="btn btn-sm"
+							:disabled="!canCreateTocEntry(chapter)"
+							@click="createTocEntry(chapter)"
+						>
+							Add TOC
+						</button>
 					</div>
 					<form
 						class="alienhand-workbench__bookmark-form"
@@ -420,6 +451,22 @@
 							Quote
 						</button>
 					</form>
+					<form
+						class="alienhand-workbench__edit-form"
+						@submit.prevent="createChapterEdit(chapter)"
+					>
+						<textarea
+							v-model="editDrafts[editDraftKey(chapter.chapter_id)]"
+							placeholder="Editorial edit note"
+							rows="3"
+						/>
+						<button
+							class="btn btn-sm"
+							:disabled="!canCreateChapterEdit(chapter)"
+						>
+							Apply edit
+						</button>
+					</form>
 				</article>
 			</section>
 		</div>
@@ -442,14 +489,19 @@ import {
 	createAlienHandRefinementBookmark,
 	createAlienHandRefinementChapter,
 	createAlienHandRefinementCut,
+	createAlienHandRefinementEdit,
 	createAlienHandRefinementQuote,
 	createAlienHandRefinementSticky,
+	createAlienHandRefinementTocEntry,
 	listAlienHandRefinementBlocks,
 	listAlienHandRefinementBookmarks,
 	listAlienHandRefinementChapters,
 	listAlienHandRefinementCuts,
+	listAlienHandRefinementEditDiffs,
+	listAlienHandRefinementEdits,
 	listAlienHandRefinementQuotes,
 	listAlienHandRefinementStickies,
+	listAlienHandRefinementToc,
 	removeAlienHandRefinementCut,
 	removeAlienHandRefinementSticky,
 	searchAlienHandRefinement,
@@ -457,8 +509,11 @@ import {
 	type AlienHandConversationBlock,
 	type AlienHandConversationChapter,
 	type AlienHandConversationCut,
+	type AlienHandConversationEdit,
+	type AlienHandConversationEditDiff,
 	type AlienHandConversationQuote,
 	type AlienHandConversationSticky,
+	type AlienHandConversationTocEntry,
 	type AlienHandRefinementTargetType,
 	type AlienHandStickyTargetType,
 } from "../js/helpers/alienhand";
@@ -475,8 +530,12 @@ export default defineComponent({
 		const bookmarks = ref<AlienHandConversationBookmark[]>([]);
 		const quotes = ref<AlienHandConversationQuote[]>([]);
 		const stickies = ref<AlienHandConversationSticky[]>([]);
+		const edits = ref<AlienHandConversationEdit[]>([]);
+		const editDiffs = ref<AlienHandConversationEditDiff[]>([]);
+		const tocEntries = ref<AlienHandConversationTocEntry[]>([]);
 		const bookmarkDrafts = ref<Record<string, string>>({});
 		const quoteDrafts = ref<Record<string, string>>({});
+		const editDrafts = ref<Record<string, string>>({});
 		const loading = ref(false);
 		const error = ref("");
 		const pendingBlockId = ref("");
@@ -484,6 +543,8 @@ export default defineComponent({
 		const pendingBookmarkKey = ref("");
 		const pendingQuoteKey = ref("");
 		const pendingStickyKey = ref("");
+		const pendingEditChapterId = ref("");
+		const pendingTocChapterId = ref("");
 		const searchTerm = ref("");
 		const searchHitBlockIds = ref(new Set<string>());
 		const chapterTitle = ref("");
@@ -540,6 +601,29 @@ export default defineComponent({
 
 			return grouped;
 		});
+		const editDiffsByEdit = computed(() => {
+			const grouped = new Map<string, AlienHandConversationEditDiff[]>();
+
+			for (const diff of editDiffs.value) {
+				const group = grouped.get(diff.edit_id) || [];
+				group.push(diff);
+				grouped.set(diff.edit_id, group);
+			}
+
+			return grouped;
+		});
+		const tocEntriesByTarget = computed(() => {
+			const grouped = new Map<string, AlienHandConversationTocEntry[]>();
+
+			for (const entry of tocEntries.value) {
+				const key = targetKey(entry.entry_type, entry.target_id);
+				const group = grouped.get(key) || [];
+				group.push(entry);
+				grouped.set(key, group);
+			}
+
+			return grouped;
+		});
 		const rawDebugText = computed(() =>
 			JSON.stringify(
 				{
@@ -547,8 +631,11 @@ export default defineComponent({
 					bookmarks: bookmarks.value,
 					chapters: chapters.value,
 					cuts: cuts.value,
+					editDiffs: editDiffs.value,
+					edits: edits.value,
 					quotes: quotes.value,
 					stickies: stickies.value,
+					tocEntries: tocEntries.value,
 				},
 				null,
 				2
@@ -564,13 +651,26 @@ export default defineComponent({
 			error.value = "";
 
 			try {
-				const [nextBlocks, nextCuts, nextChapters, nextBookmarks, nextQuotes, nextStickies] = await Promise.all([
+				const [
+					nextBlocks,
+					nextCuts,
+					nextChapters,
+					nextBookmarks,
+					nextQuotes,
+					nextStickies,
+					nextEdits,
+					nextEditDiffs,
+					nextTocEntries,
+				] = await Promise.all([
 					listAlienHandRefinementBlocks(channelUuid.value),
 					listAlienHandRefinementCuts(channelUuid.value),
 					listAlienHandRefinementChapters(channelUuid.value),
 					listAlienHandRefinementBookmarks(channelUuid.value),
 					listAlienHandRefinementQuotes(channelUuid.value),
 					listAlienHandRefinementStickies(channelUuid.value),
+					listAlienHandRefinementEdits(),
+					listAlienHandRefinementEditDiffs(),
+					listAlienHandRefinementToc("main"),
 				]);
 
 				blocks.value = nextBlocks;
@@ -579,6 +679,9 @@ export default defineComponent({
 				bookmarks.value = nextBookmarks;
 				quotes.value = nextQuotes;
 				stickies.value = nextStickies;
+				edits.value = nextEdits;
+				editDiffs.value = nextEditDiffs;
+				tocEntries.value = nextTocEntries;
 			} catch (caught) {
 				error.value = caught instanceof Error ? caught.message : String(caught);
 			} finally {
@@ -676,6 +779,24 @@ export default defineComponent({
 		const firstSticky = (targetType: AlienHandStickyTargetType, targetId: string) =>
 			targetStickies(targetType, targetId)[0];
 
+		const chapterEdits = (chapter: AlienHandConversationChapter) => {
+			const editIds = new Set(chapter.edit_chain || []);
+
+			return edits.value.filter(
+				(edit) =>
+					editIds.has(edit.edit_id) ||
+					edit.input_ref.id === chapter.chapter_id ||
+					edit.output_ref.id === chapter.chapter_id
+			);
+		};
+
+		const editDiffsForEdit = (editId: string) => editDiffsByEdit.value.get(editId) || [];
+
+		const tocEntriesForTarget = (entryType: string, targetId: string) =>
+			tocEntriesByTarget.value.get(targetKey(entryType, targetId)) || [];
+
+		const editDraftKey = (chapterId: string) => targetKey("chapter-edit", chapterId);
+
 		const canCreateBookmark = (targetType: AlienHandRefinementTargetType, targetId: string) => {
 			const key = bookmarkKey(targetType, targetId);
 			return Boolean(bookmarkDrafts.value[key]?.trim()) && pendingBookmarkKey.value !== key;
@@ -690,6 +811,15 @@ export default defineComponent({
 			const key = targetKey(targetType, targetId);
 			return !targetStickies(targetType, targetId).length && pendingStickyKey.value !== key;
 		};
+
+		const canCreateChapterEdit = (chapter: AlienHandConversationChapter) => {
+			const key = editDraftKey(chapter.chapter_id);
+			return Boolean(editDrafts.value[key]?.trim()) && pendingEditChapterId.value !== chapter.chapter_id;
+		};
+
+		const canCreateTocEntry = (chapter: AlienHandConversationChapter) =>
+			!tocEntriesForTarget("chapter", chapter.chapter_id).length &&
+			pendingTocChapterId.value !== chapter.chapter_id;
 
 		const createBookmark = async (targetType: AlienHandRefinementTargetType, targetId: string) => {
 			const key = bookmarkKey(targetType, targetId);
@@ -778,6 +908,66 @@ export default defineComponent({
 			}
 		};
 
+		const createChapterEdit = async (chapter: AlienHandConversationChapter) => {
+			const key = editDraftKey(chapter.chapter_id);
+			const note = editDrafts.value[key]?.trim() || "";
+
+			if (!note) {
+				error.value = "Add an edit note before applying an editorial edit.";
+				return;
+			}
+
+			pendingEditChapterId.value = chapter.chapter_id;
+			error.value = "";
+
+			try {
+				await createAlienHandRefinementEdit(
+					{type: "chapter", id: chapter.chapter_id},
+					{
+						type: "chapter",
+						id: chapter.chapter_id,
+						revision: chapterEdits(chapter).length + 1,
+					},
+					"annotate",
+					note,
+					{
+						add: [{path: "/editorial_notes/-", value: note}],
+						chapter_id: chapter.chapter_id,
+					}
+				);
+				delete editDrafts.value[key];
+				await refresh();
+			} catch (caught) {
+				error.value = caught instanceof Error ? caught.message : String(caught);
+			} finally {
+				pendingEditChapterId.value = "";
+			}
+		};
+
+		const createTocEntry = async (chapter: AlienHandConversationChapter) => {
+			pendingTocChapterId.value = chapter.chapter_id;
+			error.value = "";
+
+			try {
+				await createAlienHandRefinementTocEntry(
+					"main",
+					tocEntries.value.length,
+					"chapter",
+					chapter.chapter_id,
+					chapter.title || `Chapter ${tocEntries.value.length + 1}`,
+					{
+						block_ids: chapter.member_block_ids,
+						cut_ids: chapter.member_cut_ids,
+					}
+				);
+				await refresh();
+			} catch (caught) {
+				error.value = caught instanceof Error ? caught.message : String(caught);
+			} finally {
+				pendingTocChapterId.value = "";
+			}
+		};
+
 		const formatTimestamp = (value: string) => {
 			const timestamp = Date.parse(value);
 
@@ -788,6 +978,8 @@ export default defineComponent({
 			return new Date(timestamp).toLocaleString();
 		};
 
+		const formatJson = (value: unknown) => JSON.stringify(value, null, 2);
+
 		watch(
 			channelUuid,
 			async () => {
@@ -797,8 +989,12 @@ export default defineComponent({
 				bookmarks.value = [];
 				quotes.value = [];
 				stickies.value = [];
+				edits.value = [];
+				editDiffs.value = [];
+				tocEntries.value = [];
 				bookmarkDrafts.value = {};
 				quoteDrafts.value = {};
+				editDrafts.value = {};
 				searchHitBlockIds.value = new Set();
 				await refresh();
 			},
@@ -813,24 +1009,37 @@ export default defineComponent({
 			bookmarks,
 			blocks,
 			canCreateBookmark,
+			canCreateChapterEdit,
 			canCreateQuote,
 			canCreateSticky,
+			canCreateTocEntry,
 			channelUuid,
+			chapterEdits,
 			chapterSummary,
 			chapterTitle,
 			chapters,
 			createBookmark,
 			createChapter,
+			createChapterEdit,
 			createCut,
 			createQuote,
 			createSticky,
+			createTocEntry,
 			cuts,
+			editDiffs,
+			editDiffsForEdit,
+			editDraftKey,
+			editDrafts,
+			edits,
 			error,
 			firstSticky,
+			formatJson,
 			formatTimestamp,
 			loading,
 			pendingBlockId,
 			pendingCutId,
+			pendingEditChapterId,
+			pendingTocChapterId,
 			quoteDrafts,
 			quoteKey,
 			quotes,
@@ -850,6 +1059,8 @@ export default defineComponent({
 			targetBookmarks,
 			targetQuotes,
 			targetStickies,
+			tocEntries,
+			tocEntriesForTarget,
 		};
 	},
 });
