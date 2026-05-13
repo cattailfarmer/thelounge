@@ -304,11 +304,13 @@ export async function listAlienHandRefinementQuotes(
 
 export async function listAlienHandRefinementStickies(
 	channelUuid: string,
-	targetType?: AlienHandStickyTargetType
+	targetType?: AlienHandStickyTargetType,
+	clearState = "active"
 ): Promise<AlienHandConversationSticky[]> {
 	const targetTypeQuery = targetType ? `&target_type=${encodeURIComponent(targetType)}` : "";
+	const clearStateQuery = clearState ? `&clear_state=${encodeURIComponent(clearState)}` : "";
 	const response = await fetchAlienHandRefinement<{stickies?: AlienHandConversationSticky[]}>(
-		`/stickies?channel=${encodeURIComponent(channelUuid)}${targetTypeQuery}`
+		`/stickies?channel=${encodeURIComponent(channelUuid)}${targetTypeQuery}${clearStateQuery}`
 	);
 
 	return response.stickies || [];
@@ -427,6 +429,17 @@ export async function createAlienHandRefinementSticky(
 			}),
 			method: "POST",
 		}
+	);
+
+	return response.sticky;
+}
+
+export async function removeAlienHandRefinementSticky(
+	stickyId: string
+): Promise<AlienHandConversationSticky> {
+	const response = await fetchAlienHandRefinement<{sticky: AlienHandConversationSticky}>(
+		`/stickies/${encodeURIComponent(stickyId)}`,
+		{method: "DELETE"}
 	);
 
 	return response.sticky;

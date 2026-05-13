@@ -57,7 +57,15 @@
 					</div>
 					<p>{{ block.presentation }}</p>
 					<div v-if="targetStickies('block', block.block_id).length" class="alienhand-workbench__stickies">
-						Pinned reminder
+						<span
+							v-for="sticky in targetStickies('block', block.block_id)"
+							:key="sticky.sticky_id"
+						>
+							Pinned reminder
+							<button class="btn btn-sm" @click="removeSticky(sticky)">
+								Unpin
+							</button>
+						</span>
 					</div>
 					<div v-if="targetBookmarks('block', block.block_id).length" class="alienhand-workbench__bookmarks">
 						<div
@@ -76,6 +84,14 @@
 								{{ bookmark.note }}
 							</span>
 							<button
+								v-if="firstSticky('bookmark', bookmark.bookmark_id)"
+								class="btn btn-sm"
+								@click="removeFirstSticky('bookmark', bookmark.bookmark_id)"
+							>
+								Unpin
+							</button>
+							<button
+								v-else
 								class="btn btn-sm"
 								:disabled="!canCreateSticky('bookmark', bookmark.bookmark_id)"
 								@click="createSticky('bookmark', bookmark.bookmark_id)"
@@ -177,7 +193,15 @@
 					</div>
 					<p>{{ blockById.get(cut.source_block_id)?.presentation || cut.source_block_id }}</p>
 					<div v-if="targetStickies('cut', cut.cut_id).length" class="alienhand-workbench__stickies">
-						Pinned reminder
+						<span
+							v-for="sticky in targetStickies('cut', cut.cut_id)"
+							:key="sticky.sticky_id"
+						>
+							Pinned reminder
+							<button class="btn btn-sm" @click="removeSticky(sticky)">
+								Unpin
+							</button>
+						</span>
 					</div>
 					<div v-if="targetBookmarks('cut', cut.cut_id).length" class="alienhand-workbench__bookmarks">
 						<div
@@ -196,6 +220,14 @@
 								{{ bookmark.note }}
 							</span>
 							<button
+								v-if="firstSticky('bookmark', bookmark.bookmark_id)"
+								class="btn btn-sm"
+								@click="removeFirstSticky('bookmark', bookmark.bookmark_id)"
+							>
+								Unpin
+							</button>
+							<button
+								v-else
 								class="btn btn-sm"
 								:disabled="!canCreateSticky('bookmark', bookmark.bookmark_id)"
 								@click="createSticky('bookmark', bookmark.bookmark_id)"
@@ -292,7 +324,15 @@
 						v-if="targetStickies('chapter', chapter.chapter_id).length"
 						class="alienhand-workbench__stickies"
 					>
-						Pinned reminder
+						<span
+							v-for="sticky in targetStickies('chapter', chapter.chapter_id)"
+							:key="sticky.sticky_id"
+						>
+							Pinned reminder
+							<button class="btn btn-sm" @click="removeSticky(sticky)">
+								Unpin
+							</button>
+						</span>
 					</div>
 					<div
 						v-if="targetBookmarks('chapter', chapter.chapter_id).length"
@@ -314,6 +354,14 @@
 								{{ bookmark.note }}
 							</span>
 							<button
+								v-if="firstSticky('bookmark', bookmark.bookmark_id)"
+								class="btn btn-sm"
+								@click="removeFirstSticky('bookmark', bookmark.bookmark_id)"
+							>
+								Unpin
+							</button>
+							<button
+								v-else
 								class="btn btn-sm"
 								:disabled="!canCreateSticky('bookmark', bookmark.bookmark_id)"
 								@click="createSticky('bookmark', bookmark.bookmark_id)"
@@ -403,6 +451,7 @@ import {
 	listAlienHandRefinementQuotes,
 	listAlienHandRefinementStickies,
 	removeAlienHandRefinementCut,
+	removeAlienHandRefinementSticky,
 	searchAlienHandRefinement,
 	type AlienHandConversationBookmark,
 	type AlienHandConversationBlock,
@@ -624,6 +673,9 @@ export default defineComponent({
 		const targetStickies = (targetType: AlienHandStickyTargetType, targetId: string) =>
 			stickiesByTarget.value.get(targetKey(targetType, targetId)) || [];
 
+		const firstSticky = (targetType: AlienHandStickyTargetType, targetId: string) =>
+			targetStickies(targetType, targetId)[0];
+
 		const canCreateBookmark = (targetType: AlienHandRefinementTargetType, targetId: string) => {
 			const key = bookmarkKey(targetType, targetId);
 			return Boolean(bookmarkDrafts.value[key]?.trim()) && pendingBookmarkKey.value !== key;
@@ -704,6 +756,28 @@ export default defineComponent({
 			}
 		};
 
+		const removeSticky = async (sticky: AlienHandConversationSticky) => {
+			pendingStickyKey.value = targetKey(sticky.target_type, sticky.target_id);
+			error.value = "";
+
+			try {
+				await removeAlienHandRefinementSticky(sticky.sticky_id);
+				await refresh();
+			} catch (caught) {
+				error.value = caught instanceof Error ? caught.message : String(caught);
+			} finally {
+				pendingStickyKey.value = "";
+			}
+		};
+
+		const removeFirstSticky = async (targetType: AlienHandStickyTargetType, targetId: string) => {
+			const sticky = firstSticky(targetType, targetId);
+
+			if (sticky) {
+				await removeSticky(sticky);
+			}
+		};
+
 		const formatTimestamp = (value: string) => {
 			const timestamp = Date.parse(value);
 
@@ -752,6 +826,7 @@ export default defineComponent({
 			createSticky,
 			cuts,
 			error,
+			firstSticky,
 			formatTimestamp,
 			loading,
 			pendingBlockId,
@@ -762,6 +837,8 @@ export default defineComponent({
 			rawDebugText,
 			refresh,
 			removeCut,
+			removeFirstSticky,
+			removeSticky,
 			runSearch,
 			searchHitBlockIds,
 			searchTerm,
