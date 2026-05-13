@@ -209,6 +209,18 @@ module.exports = {
 	// This value is set to `["polling", "websocket"]` by default.
 	transports: ["polling", "websocket"],
 
+	// ### `alienhand`
+	//
+	// AlienHand integration settings. `payloadResolverBaseUrl` points browser
+	// clients at the app-owned payload resolver used to turn compact AH1 IRC
+	// envelopes into rich render rows.
+	//
+	// This value can also be supplied through the `ALIENHAND_PAYLOAD_RESOLVER`
+	// environment variable when The Lounge is launched by AlienHand.
+	alienhand: {
+		payloadResolverBaseUrl: "",
+	},
+
 	// ### `leaveMessage`
 	//
 	// Set users' default `quit` and `part` messages if they are not providing

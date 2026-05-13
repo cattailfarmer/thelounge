@@ -1,4 +1,5 @@
 import type {AlienHandRenderRow, SharedMsg} from "../../../shared/types/msg";
+import {store} from "../store";
 
 const ENVELOPE_PROTOCOL = "AH1";
 const RESOLVER_STORAGE_KEY = "alienhandPayloadResolver";
@@ -58,6 +59,20 @@ export function getAlienHandPayloadResolverBase(): string | null {
 
 	if (configured) {
 		return configured;
+	}
+
+	const serverConfigured = normalizeBaseUrl(
+		store.state.serverConfiguration?.alienhand?.payloadResolverBaseUrl
+	);
+
+	if (serverConfigured) {
+		return serverConfigured;
+	}
+
+	const templateConfigured = normalizeBaseUrl(document.body.dataset.alienhandPayloadResolver);
+
+	if (templateConfigured) {
+		return templateConfigured;
 	}
 
 	try {

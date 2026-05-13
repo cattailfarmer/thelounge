@@ -29,6 +29,10 @@ type FileUpload = {
 	baseUrl?: string;
 };
 
+type AlienHand = {
+	payloadResolverBaseUrl: string;
+};
+
 export type Defaults = Pick<
 	Network,
 	| "name"
@@ -100,6 +104,7 @@ export type ConfigType = {
 	prefetchTimeout: number;
 	fileUpload: FileUpload;
 	transports: string[];
+	alienhand: AlienHand;
 	leaveMessage: string;
 	defaults: Defaults;
 	lockNetwork: boolean;
@@ -239,6 +244,26 @@ class Config {
 
 				log.warn(
 					`The ${colors.bold("fileUpload.baseUrl")} you specified is invalid: ${String(
+						e
+					)}`
+				);
+			}
+		}
+
+		const envPayloadResolver = process.env.ALIENHAND_PAYLOAD_RESOLVER;
+
+		if (envPayloadResolver) {
+			this.values.alienhand.payloadResolverBaseUrl = envPayloadResolver;
+		}
+
+		if (this.values.alienhand.payloadResolverBaseUrl) {
+			try {
+				new URL(this.values.alienhand.payloadResolverBaseUrl);
+			} catch (e: any) {
+				this.values.alienhand.payloadResolverBaseUrl = "";
+
+				log.warn(
+					`The ${colors.bold("alienhand.payloadResolverBaseUrl")} you specified is invalid: ${String(
 						e
 					)}`
 				);

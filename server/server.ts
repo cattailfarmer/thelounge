@@ -872,6 +872,7 @@ function getClientConfiguration(): SharedConfiguration | LockedSharedConfigurati
 		public: Config.values.public,
 		useHexIp: Config.values.useHexIp,
 		prefetch: Config.values.prefetch,
+		alienhand: Config.values.alienhand,
 		fileUploadMaxFileSize: Uploader ? Uploader.getMaxFileSize() : undefined, // TODO can't be undefined?
 	};
 

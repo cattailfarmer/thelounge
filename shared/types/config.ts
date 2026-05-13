@@ -7,6 +7,9 @@ type SharedConfigurationBase = {
 	public: boolean;
 	useHexIp: boolean;
 	prefetch: boolean;
+	alienhand: {
+		payloadResolverBaseUrl: string;
+	};
 	fileUpload: boolean;
 	ldapEnabled: boolean;
 	isUpdateAvailable: boolean;
