@@ -21,6 +21,46 @@
 
 		<p v-if="error" class="alienhand-workbench__error">{{ error }}</p>
 
+		<section class="alienhand-workbench__directory" aria-label="AlienHand directory">
+			<div class="alienhand-workbench__directory-tabs" role="tablist">
+				<button
+					type="button"
+					role="tab"
+					:aria-selected="directoryTab === 'nicks'"
+					@click="directoryTab = 'nicks'"
+				>
+					Nicks
+				</button>
+				<button
+					type="button"
+					role="tab"
+					:aria-selected="directoryTab === 'chapters'"
+					@click="directoryTab = 'chapters'"
+				>
+					Chapters
+				</button>
+			</div>
+			<div v-if="directoryTab === 'nicks'" class="alienhand-workbench__directory-panel">
+				<span>{{ channel.users.length }} user{{ channel.users.length === 1 ? "" : "s" }}</span>
+				<ul>
+					<li v-for="user in channel.users" :key="user.nick">
+						<strong>{{ user.modes[0] || "" }}</strong>
+						{{ user.nick }}
+					</li>
+				</ul>
+			</div>
+			<div v-else class="alienhand-workbench__directory-panel">
+				<span>{{ chapters.length }} chapter{{ chapters.length === 1 ? "" : "s" }}</span>
+				<ul v-if="chapters.length">
+					<li v-for="chapter in chapters" :key="chapter.chapter_id">
+						<strong>{{ chapter.member_cut_ids.length }}</strong>
+						{{ chapter.title || chapter.chapter_id }}
+					</li>
+				</ul>
+				<p v-else>No chapters yet.</p>
+			</div>
+		</section>
+
 		<div
 			v-if="selectedSourceBlock"
 			class="alienhand-workbench__source-bridge"
@@ -634,6 +674,7 @@ export default defineComponent({
 		const highlightedBlockId = ref("");
 		const highlightedCutId = ref("");
 		const highlightedEditCutId = ref("");
+		const directoryTab = ref<"nicks" | "chapters">("nicks");
 
 		const channelUuid = computed(() => alienHandChannelUuidFromName(props.channel.name));
 		const activeCuts = computed(() => cuts.value.filter((cut) => cut.status === "active"));
@@ -1199,6 +1240,7 @@ export default defineComponent({
 			createSticky,
 			createTocEntry,
 			cuts,
+			directoryTab,
 			editDiffs,
 			editDiffsForEdit,
 			editDraftKey,

@@ -244,6 +244,68 @@
 	opacity: 0.55;
 }
 
+#chat .alienhand-workbench__directory {
+	background: #fffdf8;
+	border-bottom: 1px solid var(--alienhand-border);
+	display: grid;
+	gap: 0.5rem;
+	padding: 0.65rem 0.75rem;
+}
+
+#chat .alienhand-workbench__directory-tabs {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+}
+
+#chat .alienhand-workbench__directory-tabs button {
+	background: #e8e5dc;
+	border: 2px solid #20292f;
+	color: var(--alienhand-text);
+	font-weight: 700;
+	padding: 0.3rem 0.45rem;
+	text-align: left;
+}
+
+#chat .alienhand-workbench__directory-tabs button[aria-selected="true"] {
+	background: #fffdf8;
+	border-bottom-color: #fffdf8;
+}
+
+#chat .alienhand-workbench__directory-panel {
+	border: 2px solid #20292f;
+	border-radius: 0 0 8px 8px;
+	margin-top: -0.5rem;
+	max-height: 8rem;
+	overflow: auto;
+	padding: 0.55rem;
+}
+
+#chat .alienhand-workbench__directory-panel > span,
+#chat .alienhand-workbench__directory-panel p {
+	color: var(--alienhand-muted);
+	font-size: 0.76rem;
+}
+
+#chat .alienhand-workbench__directory-panel ul {
+	display: grid;
+	gap: 0.2rem;
+	list-style: none;
+	margin: 0.35rem 0 0;
+	padding: 0;
+}
+
+#chat .alienhand-workbench__directory-panel li {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+#chat .alienhand-workbench__directory-panel strong {
+	color: #e6007a;
+	display: inline-block;
+	min-width: 1.2rem;
+}
+
 #chat .alienhand-workbench__source-bubble {
 	align-items: center;
 	background: #fffdf8;
