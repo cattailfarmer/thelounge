@@ -35,6 +35,15 @@
 		</header>
 
 		<p v-if="error" class="alienhand-workbench__error">{{ error }}</p>
+		<div class="alienhand-workbench__status" aria-live="polite">
+			<span
+				v-for="item in workbenchStatusItems"
+				:key="item.text"
+				:class="`alienhand-workbench__status-pill alienhand-workbench__status-pill--${item.kind}`"
+			>
+				{{ item.text }}
+			</span>
+		</div>
 
 		<div class="alienhand-workbench__layout">
 			<aside class="alienhand-workbench__directory" aria-label="AlienHand directory">
@@ -129,7 +138,7 @@
 						!selectedSourceBlock || pendingBlockId === selectedSourceBlock.block_id
 					"
 					:style="{top: `${bridgeY}px`}"
-					title="Drag to choose the cut insertion point. Click to insert the selected chat line."
+					:title="bridgeTitle"
 					@pointerdown="startBridgeDrag"
 					@click="insertFromBridge"
 				>
@@ -478,6 +487,7 @@ export default defineComponent({
 		const bridgeDragged = ref(false);
 		const bridgeDragStartY = ref(0);
 		const bridgeDragStartTop = ref(520);
+		const sourceRevealStatus = ref("");
 
 		const channelUuid = computed(() => alienHandChannelUuidFromName(props.channel.name));
 		const activeCuts = computed(() => cuts.value.filter((cut) => cut.status === "active"));
@@ -489,9 +499,58 @@ export default defineComponent({
 				? "end of Cutting"
 				: `before cut ${insertionPosition.value + 1}`
 		);
+		const bridgeBlockedReason = computed(() => {
+			if (!showRawPane.value || !showCutsPane.value) {
+				return "Bridge blocked: show Chat and Cutting to insert source blocks.";
+			}
+
+			if (!selectedSourceBlock.value) {
+				return "Bridge blocked: select a chat line with its arrow before inserting.";
+			}
+
+			if (pendingBlockId.value === selectedSourceBlock.value.block_id) {
+				return "Bridge busy: inserting selected source block.";
+			}
+
+			return "";
+		});
+		const bridgeTitle = computed(
+			() =>
+				bridgeBlockedReason.value ||
+				"Drag to choose the cut insertion point. Click to insert the selected chat line."
+		);
 		const blockById = computed(
 			() => new Map(blocks.value.map((block) => [block.block_id, block]))
 		);
+		const workbenchStatusItems = computed(() => {
+			const items: Array<{kind: string; text: string}> = [];
+
+			items.push({
+				kind: loading.value ? "busy" : "ready",
+				text: loading.value
+					? "Refreshing refinement state."
+					: `${blocks.value.length} stored blocks, ${activeCuts.value.length} active cuts.`,
+			});
+
+			if (bridgeBlockedReason.value) {
+				items.push({kind: "blocked", text: bridgeBlockedReason.value});
+			} else if (selectedSourceBlock.value) {
+				items.push({
+					kind: "ready",
+					text: `Ready to cut @${selectedSourceBlock.value.sender} at ${insertionLabel.value}.`,
+				});
+			}
+
+			if (sourceRevealStatus.value) {
+				items.push({kind: "info", text: sourceRevealStatus.value});
+			}
+
+			if (error.value) {
+				items.push({kind: "error", text: "Latest workbench error is shown above."});
+			}
+
+			return items;
+		});
 		const targetKey = (targetType: string, targetId: string) => `${targetType}:${targetId}`;
 		const bookmarkKey = (targetType: AlienHandRefinementTargetType, targetId: string) =>
 			targetKey(targetType, targetId);
@@ -614,6 +673,7 @@ export default defineComponent({
 				edits.value = nextEdits;
 				editDiffs.value = nextEditDiffs;
 				tocEntries.value = nextTocEntries;
+				sourceRevealStatus.value = "Refinement state refreshed.";
 			} catch (caught) {
 				error.value = caught instanceof Error ? caught.message : String(caught);
 			} finally {
@@ -663,6 +723,8 @@ export default defineComponent({
 
 			if (!sourceBlock) {
 				error.value = "Select a live chat line before inserting into cuts.";
+				sourceRevealStatus.value =
+					"Insertion is blocked until a source chat line is selected.";
 				return;
 			}
 
@@ -675,6 +737,7 @@ export default defineComponent({
 				await createAlienHandRefinementCut(storedBlock.block_id, position);
 				insertionIndex.value = position + 1;
 				selectedSourceBlock.value = null;
+				sourceRevealStatus.value = `Inserted source block at ${insertionLabel.value}.`;
 				await refresh();
 			} catch (caught) {
 				error.value = caught instanceof Error ? caught.message : String(caught);
@@ -1040,6 +1103,15 @@ export default defineComponent({
 				if (element) {
 					element.scrollIntoView({behavior: "smooth", block: "center"});
 					pulseSourceElement(element);
+					sourceRevealStatus.value =
+						sourceType === "block"
+							? "Revealed source chat message."
+							: "Revealed source cut.";
+				} else {
+					sourceRevealStatus.value =
+						sourceType === "block"
+							? "Source chat message is not visible in the current Chat frame."
+							: "Source cut is not visible in the current Cutting frame.";
 				}
 			});
 		};
@@ -1051,10 +1123,15 @@ export default defineComponent({
 
 			if (showCutsPane.value) {
 				scrollSourceIntoView("cut", cut.cut_id);
+			} else {
+				sourceRevealStatus.value = "Cutting is hidden, so the source cut cannot be shown.";
 			}
 
 			if (showRawPane.value) {
 				scrollSourceIntoView("block", cut.source_block_id);
+			} else {
+				sourceRevealStatus.value =
+					"Chat is hidden, so the source chat block cannot be shown.";
 			}
 		};
 
@@ -1064,6 +1141,7 @@ export default defineComponent({
 			}
 
 			selectedSourceBlock.value = block;
+			sourceRevealStatus.value = `Selected @${block.sender} for Cutting.`;
 		};
 
 		onMounted(() => {
@@ -1095,6 +1173,7 @@ export default defineComponent({
 				highlightedBlockId.value = "";
 				highlightedCutId.value = "";
 				highlightedEditCutId.value = "";
+				sourceRevealStatus.value = "";
 				await refresh();
 			},
 			{immediate: true}
@@ -1127,6 +1206,8 @@ export default defineComponent({
 			chapterTitle,
 			chapters,
 			bridgeY,
+			bridgeBlockedReason,
+			bridgeTitle,
 			createBookmark,
 			createChapter,
 			createChapterEdit,
@@ -1176,6 +1257,7 @@ export default defineComponent({
 			showRawPane,
 			showRawText,
 			sourceElementId,
+			sourceRevealStatus,
 			startBridgeDrag,
 			stickies,
 			targetBookmarks,
@@ -1183,6 +1265,7 @@ export default defineComponent({
 			targetStickies,
 			tocEntries,
 			tocEntriesForTarget,
+			workbenchStatusItems,
 		};
 	},
 });

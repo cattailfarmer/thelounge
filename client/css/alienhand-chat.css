@@ -807,6 +807,56 @@
 	white-space: nowrap;
 }
 
+#chat .alienhand-workbench__status {
+	align-items: center;
+	background: #f7faf8;
+	border-bottom: 1px solid var(--alienhand-border);
+	display: flex;
+	flex: 0 0 auto;
+	flex-wrap: wrap;
+	gap: 0.35rem;
+	padding: 0.35rem 0.65rem;
+}
+
+#chat .alienhand-workbench__status-pill {
+	border: 1px solid var(--alienhand-border);
+	border-radius: 999px;
+	color: var(--alienhand-muted);
+	font-size: 0.72rem;
+	line-height: 1.25;
+	padding: 0.18rem 0.55rem;
+}
+
+#chat .alienhand-workbench__status-pill--ready {
+	background: #eef8ee;
+	border-color: #a9d8a9;
+	color: #2f6c37;
+}
+
+#chat .alienhand-workbench__status-pill--busy {
+	background: #edf5fb;
+	border-color: #aac9dd;
+	color: #255a79;
+}
+
+#chat .alienhand-workbench__status-pill--blocked {
+	background: #fff7df;
+	border-color: #e3c978;
+	color: #725c18;
+}
+
+#chat .alienhand-workbench__status-pill--info {
+	background: #f1f4f7;
+	border-color: #c9d3db;
+	color: #4c5e69;
+}
+
+#chat .alienhand-workbench__status-pill--error {
+	background: #fdebea;
+	border-color: #e6a9a5;
+	color: #9c302b;
+}
+
 #chat .alienhand-workbench__layout {
 	display: flex;
 	flex: 1 1 auto;

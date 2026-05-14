@@ -242,7 +242,11 @@ export async function resolveAlienHandMessage(message: SharedMsg): Promise<boole
 	const resolverBase = getAlienHandPayloadResolverBase();
 
 	if (!resolverBase) {
-		message.alienhand = buildAlienHandStatusRow(envelope, "payload_resolver_unconfigured", "payload_error");
+		message.alienhand = buildAlienHandStatusRow(
+			envelope,
+			"payload_resolver_unconfigured",
+			"payload_error"
+		);
 		return true;
 	}
 
@@ -532,20 +536,20 @@ export async function createAlienHandRefinementEdit(
 	diffContent: Record<string, unknown>,
 	author = "thelounge-user"
 ): Promise<{edit: AlienHandConversationEdit; diff: AlienHandConversationEditDiff}> {
-	return fetchAlienHandRefinement<{edit: AlienHandConversationEdit; diff: AlienHandConversationEditDiff}>(
-		"/edits",
-		{
-			body: JSON.stringify({
-				author,
-				diff_content: diffContent,
-				edit_type: editType,
-				input_ref: inputRef,
-				output_ref: outputRef,
-				reason,
-			}),
-			method: "POST",
-		}
-	);
+	return fetchAlienHandRefinement<{
+		edit: AlienHandConversationEdit;
+		diff: AlienHandConversationEditDiff;
+	}>("/edits", {
+		body: JSON.stringify({
+			author,
+			diff_content: diffContent,
+			edit_type: editType,
+			input_ref: inputRef,
+			output_ref: outputRef,
+			reason,
+		}),
+		method: "POST",
+	});
 }
 
 export async function createAlienHandRefinementTocEntry(
@@ -594,17 +598,59 @@ async function fetchAlienHandRefinement<T>(path: string, init: RequestInit = {})
 		headers.set("Authorization", `Bearer ${resolverToken}`);
 	}
 
-	const response = await fetch(`${resolverBase}/alienhand/refinement${path}`, {
-		...init,
-		credentials: "omit",
-		headers,
-	});
+	let response: Response;
+
+	try {
+		response = await fetch(`${resolverBase}/alienhand/refinement${path}`, {
+			...init,
+			credentials: "omit",
+			headers,
+		});
+	} catch (error) {
+		throw new Error(
+			`AlienHand refinement API fetch failed for ${path} via ${resolverBase}: ${errorMessage(
+				error
+			)}`
+		);
+	}
 
 	if (!response.ok) {
-		throw new Error(`AlienHand refinement API returned ${response.status}`);
+		throw new Error(
+			`AlienHand refinement API returned ${response.status} for ${path}${await responseDetail(
+				response
+			)}`
+		);
 	}
 
 	return (await response.json()) as T;
+}
+
+async function responseDetail(response: Response): Promise<string> {
+	try {
+		const body = (await response.clone().json()) as {error?: unknown};
+
+		if (typeof body.error === "string" && body.error.trim()) {
+			return `: ${body.error.trim()}`;
+		}
+	} catch {
+		// Fall back to text below.
+	}
+
+	try {
+		const text = (await response.clone().text()).trim();
+
+		return text ? `: ${text.slice(0, 240)}` : "";
+	} catch {
+		return "";
+	}
+}
+
+function errorMessage(error: unknown): string {
+	if (error instanceof Error && error.message) {
+		return error.message;
+	}
+
+	return String(error || "unknown fetch error");
 }
 
 function buildAlienHandStatusRow(
