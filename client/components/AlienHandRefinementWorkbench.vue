@@ -85,8 +85,25 @@
 					<span>{{ chapters.length }} chapter{{ chapters.length === 1 ? "" : "s" }}</span>
 					<ul v-if="chapters.length">
 						<li v-for="chapter in chapters" :key="chapter.chapter_id">
-							<strong>{{ chapter.member_cut_ids.length }}</strong>
-							{{ chapter.title || chapter.chapter_id }}
+							<button
+								type="button"
+								:class="[
+									'alienhand-workbench__directory-item',
+									{
+										'alienhand-workbench__directory-item--selected':
+											selectedChapterId === chapter.chapter_id,
+									},
+								]"
+								:aria-current="
+									selectedChapterId === chapter.chapter_id
+										? 'location'
+										: undefined
+								"
+								@click="selectChapter(chapter)"
+							>
+								<strong>{{ chapter.member_cut_ids.length }}</strong>
+								<span>{{ chapter.title || chapter.chapter_id }}</span>
+							</button>
 						</li>
 					</ul>
 					<p v-else>No chapters yet.</p>
@@ -421,9 +438,14 @@
 					</p>
 					<article
 						v-for="chapter in chapters"
+						:id="sourceElementId('chapter', chapter.chapter_id)"
 						:key="chapter.chapter_id"
 						:class="[
 							'alienhand-workbench__card',
+							{
+								'alienhand-workbench__card--source-highlight':
+									selectedChapterId === chapter.chapter_id,
+							},
 							{
 								'alienhand-workbench__card--bookmarked': targetBookmarks(
 									'chapter',
@@ -682,6 +704,7 @@ export default defineComponent({
 		const highlightedBlockId = ref("");
 		const highlightedCutId = ref("");
 		const highlightedEditCutId = ref("");
+		const selectedChapterId = ref("");
 		const directoryTab = ref<"nicks" | "chapters">("nicks");
 		const cutScroller = ref<HTMLElement | null>(null);
 		const bridgeRail = ref<HTMLElement | null>(null);
@@ -733,6 +756,7 @@ export default defineComponent({
 		const blockById = computed(
 			() => new Map(blocks.value.map((block) => [block.block_id, block]))
 		);
+		const cutById = computed(() => new Map(cuts.value.map((cut) => [cut.cut_id, cut])));
 		const workbenchStatusItems = computed(() => {
 			const items: Array<{kind: string; text: string}> = [];
 
@@ -1189,7 +1213,7 @@ export default defineComponent({
 
 		const editDraftKey = (chapterId: string) => targetKey("chapter-edit", chapterId);
 
-		const sourceElementId = (sourceType: "block" | "cut", sourceId: string) =>
+		const sourceElementId = (sourceType: "block" | "cut" | "chapter", sourceId: string) =>
 			`alienhand-${sourceType}-${sourceId.replace(/[^a-z0-9_-]/gi, "_")}`;
 
 		const sourceBlockElementId = (sourceId: string) => {
@@ -1403,7 +1427,7 @@ export default defineComponent({
 		};
 
 		const scrollSourceIntoView = (
-			sourceType: "block" | "cut",
+			sourceType: "block" | "cut" | "chapter",
 			sourceId: string,
 			foundMessage?: string,
 			missingMessage?: string
@@ -1422,13 +1446,17 @@ export default defineComponent({
 						foundMessage ||
 						(sourceType === "block"
 							? "Revealed source chat message."
-							: "Revealed source cut.");
+							: sourceType === "cut"
+							? "Revealed source cut."
+							: "Revealed selected chapter.");
 				} else {
 					sourceRevealStatus.value =
 						missingMessage ||
 						(sourceType === "block"
 							? "Source chat message is not visible in the current Chat frame."
-							: "Source cut is not visible in the current Cutting frame.");
+							: sourceType === "cut"
+							? "Source cut is not visible in the current Cutting frame."
+							: "Selected chapter is not visible in the current Editing frame.");
 				}
 			});
 		};
@@ -1472,6 +1500,37 @@ export default defineComponent({
 			} else {
 				sourceRevealStatus.value =
 					"Chat is hidden, so the source chat block cannot be shown.";
+			}
+		};
+
+		const selectChapter = (chapter: AlienHandConversationChapter) => {
+			selectedChapterId.value = chapter.chapter_id;
+			directoryTab.value = "chapters";
+
+			if (showEditsPane.value) {
+				scrollSourceIntoView(
+					"chapter",
+					chapter.chapter_id,
+					`Selected chapter ${chapter.title || chapter.chapter_id}.`,
+					"Editing is visible, but the selected chapter card is not currently mounted."
+				);
+			} else {
+				sourceRevealStatus.value =
+					"Editing is hidden, so the selected chapter card cannot be shown.";
+			}
+
+			const firstCut = chapter.member_cut_ids
+				.map((cutId) => cutById.value.get(cutId))
+				.find((cut): cut is AlienHandConversationCut => Boolean(cut));
+
+			if (firstCut) {
+				revealCutSource(firstCut);
+			} else {
+				highlightedCutId.value = "";
+				highlightedBlockId.value = "";
+				highlightedEditCutId.value = "";
+				sourceRevealStatus.value =
+					"Selected chapter has no currently visible source cut to reveal.";
 			}
 		};
 
@@ -1539,6 +1598,7 @@ export default defineComponent({
 				highlightedBlockId.value = "";
 				highlightedCutId.value = "";
 				highlightedEditCutId.value = "";
+				selectedChapterId.value = "";
 				sourceRevealStatus.value = "";
 				await refresh();
 			},
@@ -1599,6 +1659,7 @@ export default defineComponent({
 			cuts,
 			cutScroller,
 			cutSourcePresentation,
+			cutById,
 			directoryTab,
 			directiveSyncStatus,
 			directives,
@@ -1637,7 +1698,9 @@ export default defineComponent({
 			runSearch,
 			searchHitBlockIds,
 			searchTerm,
+			selectChapter,
 			selectedSourceBlock,
+			selectedChapterId,
 			hasCutSource,
 			showCutsPane,
 			showEditsPane,

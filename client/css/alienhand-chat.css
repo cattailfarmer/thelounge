@@ -310,6 +310,34 @@
 	white-space: nowrap;
 }
 
+#chat .alienhand-workbench__directory-item {
+	align-items: center;
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 6px;
+	color: var(--alienhand-text);
+	display: grid;
+	gap: 0.35rem;
+	grid-template-columns: auto minmax(0, 1fr);
+	padding: 0.25rem 0.35rem;
+	text-align: left;
+	width: 100%;
+}
+
+#chat .alienhand-workbench__directory-item:hover,
+#chat .alienhand-workbench__directory-item:focus,
+#chat .alienhand-workbench__directory-item--selected {
+	background: #eef5f1;
+	border-color: var(--alienhand-link);
+	outline: none;
+}
+
+#chat .alienhand-workbench__directory-item span {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
 #chat .alienhand-workbench__directory-panel strong {
 	color: #e6007a;
 	display: inline-block;
