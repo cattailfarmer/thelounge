@@ -128,6 +128,7 @@
 
 			<div
 				v-if="showRawPane && showCutsPane"
+				ref="bridgeRail"
 				class="alienhand-workbench__bridge-rail"
 				aria-label="Cut insertion bridge"
 			>
@@ -154,7 +155,11 @@
 					<strong>Cutting</strong>
 					<span>{{ activeCuts.length }} active</span>
 				</header>
-				<div ref="cutScroller" class="alienhand-workbench__frame-body">
+				<div
+					ref="cutScroller"
+					class="alienhand-workbench__frame-body"
+					@scroll="syncBridgeToInsertionMarker"
+				>
 					<p class="alienhand-workbench__pointer">
 						{{ insertionLabel }}. Select a chat line with its arrow, drag the bridge
 						arrow here, then click it to cut.
@@ -166,6 +171,7 @@
 					<div
 						v-if="!activeCuts.length || insertionPosition === 0"
 						class="alienhand-workbench__insertion-marker"
+						:data-insertion-index="0"
 					>
 						<span>&rarr;</span>
 						Insert here
@@ -257,6 +263,7 @@
 						<div
 							v-if="insertionPosition === index + 1"
 							class="alienhand-workbench__insertion-marker"
+							:data-insertion-index="index + 1"
 						>
 							<span>&rarr;</span>
 							Insert here
@@ -483,7 +490,9 @@ export default defineComponent({
 		const highlightedEditCutId = ref("");
 		const directoryTab = ref<"nicks" | "chapters">("nicks");
 		const cutScroller = ref<HTMLElement | null>(null);
+		const bridgeRail = ref<HTMLElement | null>(null);
 		const bridgeY = ref(520);
+		const bridgeDragging = ref(false);
 		const bridgeDragged = ref(false);
 		const bridgeDragStartY = ref(0);
 		const bridgeDragStartTop = ref(520);
@@ -773,19 +782,50 @@ export default defineComponent({
 			insertionIndex.value = nextIndex;
 		};
 
-		const startBridgeDrag = (event: PointerEvent) => {
-			const target = event.currentTarget as HTMLElement;
-			const railHeight = target.parentElement?.clientHeight || window.innerHeight;
+		const clampBridgeY = (value: number) => {
+			const railHeight = bridgeRail.value?.clientHeight || window.innerHeight;
 			const minY = 30;
 			const maxY = Math.max(minY, railHeight - 54);
+
+			return Math.min(Math.max(value, minY), maxY);
+		};
+
+		const syncBridgeToInsertionMarker = () => {
+			if (bridgeDragging.value) {
+				return;
+			}
+
+			window.requestAnimationFrame(() => {
+				const rail = bridgeRail.value;
+				const marker = cutScroller.value?.querySelector<HTMLElement>(
+					`[data-insertion-index="${insertionPosition.value}"]`
+				);
+
+				if (!rail || !marker) {
+					return;
+				}
+
+				const railRect = rail.getBoundingClientRect();
+				const markerRect = marker.getBoundingClientRect();
+				const arrowCenterOffset = 17;
+
+				bridgeY.value = clampBridgeY(
+					markerRect.top + markerRect.height / 2 - railRect.top - arrowCenterOffset
+				);
+			});
+		};
+
+		const startBridgeDrag = (event: PointerEvent) => {
+			const target = event.currentTarget as HTMLElement;
 			bridgeDragStartY.value = event.clientY;
 			bridgeDragStartTop.value = bridgeY.value;
+			bridgeDragging.value = true;
 			bridgeDragged.value = false;
 			target.setPointerCapture(event.pointerId);
 
 			const moveBridge = (moveEvent: PointerEvent) => {
 				const delta = moveEvent.clientY - bridgeDragStartY.value;
-				bridgeY.value = Math.min(Math.max(bridgeDragStartTop.value + delta, minY), maxY);
+				bridgeY.value = clampBridgeY(bridgeDragStartTop.value + delta);
 
 				if (Math.abs(delta) > 4) {
 					bridgeDragged.value = true;
@@ -796,6 +836,8 @@ export default defineComponent({
 
 			const stopBridge = () => {
 				window.removeEventListener("pointermove", moveBridge);
+				bridgeDragging.value = false;
+				syncBridgeToInsertionMarker();
 				window.setTimeout(() => {
 					bridgeDragged.value = false;
 				}, 0);
@@ -1185,6 +1227,20 @@ export default defineComponent({
 				if (insertionIndex.value > count) {
 					insertionIndex.value = count;
 				}
+
+				syncBridgeToInsertionMarker();
+			}
+		);
+
+		watch(
+			() => [
+				insertionPosition.value,
+				showRawPane.value,
+				showCutsPane.value,
+				selectedSourceBlock.value?.block_id || "",
+			],
+			() => {
+				syncBridgeToInsertionMarker();
 			}
 		);
 
@@ -1205,6 +1261,7 @@ export default defineComponent({
 			chapterSummary,
 			chapterTitle,
 			chapters,
+			bridgeRail,
 			bridgeY,
 			bridgeBlockedReason,
 			bridgeTitle,
@@ -1259,6 +1316,7 @@ export default defineComponent({
 			sourceElementId,
 			sourceRevealStatus,
 			startBridgeDrag,
+			syncBridgeToInsertionMarker,
 			stickies,
 			targetBookmarks,
 			targetQuotes,
