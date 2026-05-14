@@ -975,8 +975,8 @@ export default defineComponent({
 			}
 		};
 
-		const insertSelectedSource = async () => {
-			const sourceBlock = selectedSourceBlock.value;
+		const insertSelectedSource = async (sourceBlockInput?: AlienHandConversationBlockInput) => {
+			const sourceBlock = sourceBlockInput || selectedSourceBlock.value;
 
 			if (!sourceBlock) {
 				error.value = "Select a live chat line before inserting into cuts.";
@@ -993,7 +993,11 @@ export default defineComponent({
 				const position = insertionPosition.value;
 				await createAlienHandRefinementCut(storedBlock.block_id, position);
 				insertionIndex.value = position + 1;
-				selectedSourceBlock.value = null;
+
+				if (selectedSourceBlock.value?.block_id === sourceBlock.block_id) {
+					selectedSourceBlock.value = null;
+				}
+
 				sourceRevealStatus.value = `Inserted source block at ${insertionLabel.value}.`;
 				await refresh();
 			} catch (caught) {
@@ -1480,8 +1484,21 @@ export default defineComponent({
 			sourceRevealStatus.value = `Selected @${block.sender} for Cutting.`;
 		};
 
+		const onSourceMessageInsertRequested = (block: AlienHandConversationBlockInput) => {
+			if (block.channel_uuid !== channelUuid.value) {
+				return;
+			}
+
+			selectedSourceBlock.value = block;
+			void insertSelectedSource(block);
+		};
+
 		onMounted(() => {
 			eventbus.on("alienhand:source-message:selected", onSourceMessageSelected);
+			eventbus.on(
+				"alienhand:source-message:insert-requested",
+				onSourceMessageInsertRequested
+			);
 			directivePollTimer = window.setInterval(() => {
 				void pollDirectiveLedger();
 			}, 5000);
@@ -1489,6 +1506,10 @@ export default defineComponent({
 
 		onBeforeUnmount(() => {
 			eventbus.off("alienhand:source-message:selected", onSourceMessageSelected);
+			eventbus.off(
+				"alienhand:source-message:insert-requested",
+				onSourceMessageInsertRequested
+			);
 
 			if (directivePollTimer !== null) {
 				window.clearInterval(directivePollTimer);

@@ -125,6 +125,7 @@
 								ref="messageList"
 								:network="network"
 								:channel="channel"
+								alien-hand-cutting-active
 								:focused="focused"
 							/>
 						</template>

@@ -23,9 +23,9 @@
 			v-if="alienHandSourceAvailable"
 			class="alienhand-source-arrow"
 			type="button"
-			aria-label="Stage this message for cuts"
-			title="Stage this message for cuts"
-			@click.stop="selectAlienHandSource"
+			aria-label="Insert this message into cuts at the current Cutting position"
+			title="Insert this message into cuts at the current Cutting position"
+			@click.stop="insertAlienHandSource"
 		>
 			&rarr;
 		</button>
@@ -144,6 +144,7 @@ export default defineComponent({
 		network: {type: Object as PropType<ClientNetwork>, required: true},
 		keepScrollPosition: Function as PropType<() => void>,
 		isPreviousSource: Boolean,
+		alienHandCuttingActive: Boolean,
 		focused: Boolean,
 	},
 	setup(props) {
@@ -192,7 +193,10 @@ export default defineComponent({
 		});
 
 		const alienHandSourceAvailable = computed(
-			() => Boolean(alienHandChannelUuid.value) && Boolean(alienHandPresentation.value.trim())
+			() =>
+				props.alienHandCuttingActive &&
+				Boolean(alienHandChannelUuid.value) &&
+				Boolean(alienHandPresentation.value.trim())
 		);
 
 		const messageComponent = computed(() => {
@@ -207,7 +211,7 @@ export default defineComponent({
 			return typeof MessageTypes["message-" + props.message.type] !== "undefined";
 		};
 
-		const selectAlienHandSource = () => {
+		const insertAlienHandSource = () => {
 			const channelUuid = alienHandChannelUuid.value;
 
 			if (!channelUuid) {
@@ -237,6 +241,7 @@ export default defineComponent({
 			};
 
 			eventbus.emit("alienhand:source-message:selected", block);
+			eventbus.emit("alienhand:source-message:insert-requested", block);
 		};
 
 		return {
@@ -246,7 +251,7 @@ export default defineComponent({
 			messageTimeLocale,
 			messageComponent,
 			isAction,
-			selectAlienHandSource,
+			insertAlienHandSource,
 		};
 	},
 });

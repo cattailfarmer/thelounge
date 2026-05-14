@@ -49,6 +49,7 @@
 					:message="message"
 					:keep-scroll-position="keepScrollPosition"
 					:is-previous-source="isPreviousSource(message, id)"
+					:alien-hand-cutting-active="alienHandCuttingActive"
 					:focused="message.id === focused"
 					@toggle-link-preview="onLinkPreviewToggle"
 				/>
@@ -102,6 +103,7 @@ export default defineComponent({
 	props: {
 		network: {type: Object as PropType<ClientNetwork>, required: true},
 		channel: {type: Object as PropType<ClientChan>, required: true},
+		alienHandCuttingActive: Boolean,
 		focused: Number,
 	},
 	setup(props) {
