@@ -211,10 +211,13 @@
 								</button>
 							</div>
 							<p>
-								{{
-									blockById.get(cut.source_block_id)?.presentation ||
-									cut.source_block_id
-								}}
+								<span
+									:class="{
+										'alienhand-workbench__stale-source': !hasCutSource(cut),
+									}"
+								>
+									{{ cutSourcePresentation(cut) }}
+								</span>
 							</p>
 							<div
 								v-if="targetBookmarks('cut', cut.cut_id).length"
@@ -276,6 +279,26 @@
 							Create chapter
 						</button>
 					</form>
+					<details v-if="removedCuts.length" class="alienhand-workbench__removed-cuts">
+						<summary>{{ removedCuts.length }} removed cuts</summary>
+						<button
+							v-for="cut in removedCuts"
+							:id="sourceElementId('cut', cut.cut_id)"
+							:key="`removed:${cut.cut_id}`"
+							type="button"
+							class="alienhand-workbench__removed-cut"
+							@click="revealCutSource(cut)"
+						>
+							<span>Removed cut</span>
+							<span
+								:class="{
+									'alienhand-workbench__stale-source': !hasCutSource(cut),
+								}"
+							>
+								{{ cutSourcePresentation(cut) }}
+							</span>
+						</button>
+					</details>
 				</div>
 			</section>
 
@@ -305,10 +328,11 @@
 							]"
 							@click="revealCutSource(cut)"
 						>
-							{{
-								blockById.get(cut.source_block_id)?.presentation ||
-								cut.source_block_id
-							}}
+							<span
+								:class="{'alienhand-workbench__stale-source': !hasCutSource(cut)}"
+							>
+								{{ cutSourcePresentation(cut) }}
+							</span>
 						</button>
 					</div>
 					<p v-if="!chapters.length" class="alienhand-workbench__empty">
@@ -456,6 +480,7 @@ export default defineComponent({
 	setup(props) {
 		const blocks = ref<AlienHandConversationBlock[]>([]);
 		const cuts = ref<AlienHandConversationCut[]>([]);
+		const removedCuts = ref<AlienHandConversationCut[]>([]);
 		const chapters = ref<AlienHandConversationChapter[]>([]);
 		const bookmarks = ref<AlienHandConversationBookmark[]>([]);
 		const quotes = ref<AlienHandConversationQuote[]>([]);
@@ -634,6 +659,7 @@ export default defineComponent({
 					editDiffs: editDiffs.value,
 					edits: edits.value,
 					quotes: quotes.value,
+					removedCuts: removedCuts.value,
 					stickies: stickies.value,
 					tocEntries: tocEntries.value,
 				},
@@ -654,6 +680,7 @@ export default defineComponent({
 				const [
 					nextBlocks,
 					nextCuts,
+					nextRemovedCuts,
 					nextChapters,
 					nextBookmarks,
 					nextQuotes,
@@ -664,6 +691,7 @@ export default defineComponent({
 				] = await Promise.all([
 					listAlienHandRefinementBlocks(channelUuid.value),
 					listAlienHandRefinementCuts(channelUuid.value),
+					listAlienHandRefinementCuts(channelUuid.value, "removed"),
 					listAlienHandRefinementChapters(channelUuid.value),
 					listAlienHandRefinementBookmarks(channelUuid.value),
 					listAlienHandRefinementQuotes(channelUuid.value),
@@ -675,6 +703,7 @@ export default defineComponent({
 
 				blocks.value = nextBlocks;
 				cuts.value = nextCuts;
+				removedCuts.value = nextRemovedCuts;
 				chapters.value = nextChapters;
 				bookmarks.value = nextBookmarks;
 				quotes.value = nextQuotes;
@@ -893,6 +922,13 @@ export default defineComponent({
 
 		const targetBookmarks = (targetType: AlienHandRefinementTargetType, targetId: string) =>
 			bookmarksByTarget.value.get(bookmarkKey(targetType, targetId)) || [];
+
+		const hasCutSource = (cut: AlienHandConversationCut) =>
+			blockById.value.has(cut.source_block_id);
+
+		const cutSourcePresentation = (cut: AlienHandConversationCut) =>
+			blockById.value.get(cut.source_block_id)?.presentation ||
+			`Missing source block ${cut.source_block_id}`;
 
 		const targetQuotes = (sourceType: AlienHandRefinementTargetType, sourceId: string) =>
 			quotesBySource.value.get(quoteKey(sourceType, sourceId)) || [];
@@ -1134,7 +1170,12 @@ export default defineComponent({
 			}, 1800);
 		};
 
-		const scrollSourceIntoView = (sourceType: "block" | "cut", sourceId: string) => {
+		const scrollSourceIntoView = (
+			sourceType: "block" | "cut",
+			sourceId: string,
+			foundMessage?: string,
+			missingMessage?: string
+		) => {
 			window.requestAnimationFrame(() => {
 				const element = document.getElementById(
 					sourceType === "block"
@@ -1146,14 +1187,16 @@ export default defineComponent({
 					element.scrollIntoView({behavior: "smooth", block: "center"});
 					pulseSourceElement(element);
 					sourceRevealStatus.value =
-						sourceType === "block"
+						foundMessage ||
+						(sourceType === "block"
 							? "Revealed source chat message."
-							: "Revealed source cut.";
+							: "Revealed source cut.");
 				} else {
 					sourceRevealStatus.value =
-						sourceType === "block"
+						missingMessage ||
+						(sourceType === "block"
 							? "Source chat message is not visible in the current Chat frame."
-							: "Source cut is not visible in the current Cutting frame.";
+							: "Source cut is not visible in the current Cutting frame.");
 				}
 			});
 		};
@@ -1163,14 +1206,37 @@ export default defineComponent({
 			highlightedBlockId.value = cut.source_block_id;
 			highlightedEditCutId.value = cut.cut_id;
 
+			if (cut.status !== "active") {
+				sourceRevealStatus.value = "Revealing source for a removed cut.";
+			}
+
+			if (!hasCutSource(cut)) {
+				sourceRevealStatus.value =
+					"Cut source block is missing from the current stored block set.";
+			}
+
 			if (showCutsPane.value) {
-				scrollSourceIntoView("cut", cut.cut_id);
+				scrollSourceIntoView(
+					"cut",
+					cut.cut_id,
+					!hasCutSource(cut)
+						? "Revealed cut; source block is missing from the stored block set."
+						: cut.status === "active"
+						? "Revealed source cut."
+						: "Revealed removed cut.",
+					cut.status === "active"
+						? "Source cut is not visible in the current Cutting frame."
+						: "Removed cut is not visible in the current Cutting frame."
+				);
 			} else {
 				sourceRevealStatus.value = "Cutting is hidden, so the source cut cannot be shown.";
 			}
 
-			if (showRawPane.value) {
+			if (showRawPane.value && hasCutSource(cut)) {
 				scrollSourceIntoView("block", cut.source_block_id);
+			} else if (showRawPane.value) {
+				sourceRevealStatus.value =
+					"Cut source block is missing from the current stored block set.";
 			} else {
 				sourceRevealStatus.value =
 					"Chat is hidden, so the source chat block cannot be shown.";
@@ -1206,6 +1272,7 @@ export default defineComponent({
 				edits.value = [];
 				editDiffs.value = [];
 				tocEntries.value = [];
+				removedCuts.value = [];
 				selectedSourceBlock.value = null;
 				bookmarkDrafts.value = {};
 				quoteDrafts.value = {};
@@ -1274,6 +1341,7 @@ export default defineComponent({
 			createTocEntry,
 			cuts,
 			cutScroller,
+			cutSourcePresentation,
 			directoryTab,
 			editDiffs,
 			editDiffsForEdit,
@@ -1305,10 +1373,12 @@ export default defineComponent({
 			removeFirstSticky,
 			removeSticky,
 			revealCutSource,
+			removedCuts,
 			runSearch,
 			searchHitBlockIds,
 			searchTerm,
 			selectedSourceBlock,
+			hasCutSource,
 			showCutsPane,
 			showEditsPane,
 			showRawPane,

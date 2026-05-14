@@ -998,6 +998,47 @@
 	line-height: 1;
 }
 
+#chat .alienhand-workbench__removed-cuts {
+	border-top: 1px dashed var(--alienhand-border);
+	margin-top: 0.75rem;
+	padding-top: 0.65rem;
+}
+
+#chat .alienhand-workbench__removed-cuts summary {
+	color: var(--alienhand-muted);
+	cursor: pointer;
+	font-size: 0.78rem;
+	font-weight: 700;
+	margin-bottom: 0.45rem;
+}
+
+#chat .alienhand-workbench__removed-cut {
+	align-items: center;
+	background: #f8faf9;
+	border: 1px solid var(--alienhand-border);
+	border-radius: 8px;
+	color: var(--alienhand-text);
+	display: flex;
+	gap: 0.55rem;
+	margin-bottom: 0.35rem;
+	padding: 0.35rem 0.5rem;
+	text-align: left;
+	width: 100%;
+}
+
+#chat .alienhand-workbench__removed-cut > span:first-child {
+	color: var(--alienhand-muted);
+	font-size: 0.72rem;
+	font-weight: 700;
+	text-transform: uppercase;
+	white-space: nowrap;
+}
+
+#chat .alienhand-workbench__stale-source {
+	color: #9c302b;
+	font-style: italic;
+}
+
 #chat .alienhand-workbench__message-source-highlight,
 #chat .msg.alienhand-workbench__message-source-highlight {
 	animation: alienhand-source-pulse 1.4s ease-out;
