@@ -99,7 +99,13 @@
 						</div>
 					</div>
 				</div>
-				<div v-else class="chat-content">
+				<div
+					v-else
+					:class="[
+						'chat-content',
+						{'alienhand-chat-content': alienHandChannelUuid && showAlienHandWorkbench},
+					]"
+				>
 					<button
 						:class="[
 							'scroll-down tooltipped tooltipped-w tooltipped-no-touch',
@@ -110,17 +116,28 @@
 					>
 						<div class="scroll-down-arrow" />
 					</button>
-					<ChatUserList v-if="channel.type === 'channel'" :channel="channel" />
 					<AlienHandRefinementWorkbench
 						v-if="showAlienHandWorkbench && alienHandChannelUuid"
 						:channel="channel"
-					/>
-					<MessageList
-						ref="messageList"
-						:network="network"
-						:channel="channel"
-						:focused="focused"
-					/>
+					>
+						<template v-slot:chat>
+							<MessageList
+								ref="messageList"
+								:network="network"
+								:channel="channel"
+								:focused="focused"
+							/>
+						</template>
+					</AlienHandRefinementWorkbench>
+					<template v-else>
+						<ChatUserList v-if="channel.type === 'channel'" :channel="channel" />
+						<MessageList
+							ref="messageList"
+							:network="network"
+							:channel="channel"
+							:focused="focused"
+						/>
+					</template>
 				</div>
 			</div>
 		</div>

@@ -1,586 +1,384 @@
 <template>
-	<aside v-if="channelUuid" class="alienhand-workbench" aria-label="AlienHand refinement workbench">
-		<header class="alienhand-workbench__header">
-			<div>
-				<strong>AlienHand refinement</strong>
-				<span>{{ channelUuid }}</span>
-			</div>
-			<div class="alienhand-workbench__controls">
-				<button class="btn btn-sm" :disabled="loading" @click="refresh">Refresh</button>
-				<button class="btn btn-sm" :aria-pressed="showRawPane" @click="showRawPane = !showRawPane">
+	<section
+		v-if="channelUuid"
+		class="alienhand-workbench"
+		aria-label="AlienHand refinement workbench"
+	>
+		<header class="alienhand-workbench__switchbar">
+			<div class="alienhand-workbench__switches" aria-label="AlienHand frame toggles">
+				<button
+					type="button"
+					:aria-pressed="showRawPane"
+					@click="showRawPane = !showRawPane"
+				>
 					Chat
 				</button>
-				<button class="btn btn-sm" :aria-pressed="showCutsPane" @click="showCutsPane = !showCutsPane">
+				<button
+					type="button"
+					:aria-pressed="showCutsPane"
+					@click="showCutsPane = !showCutsPane"
+				>
 					Cutting
 				</button>
-				<button class="btn btn-sm" :aria-pressed="showEditsPane" @click="showEditsPane = !showEditsPane">
+				<button
+					type="button"
+					:aria-pressed="showEditsPane"
+					@click="showEditsPane = !showEditsPane"
+				>
 					Editing
 				</button>
+			</div>
+			<div class="alienhand-workbench__runtime">
+				<span>{{ channelUuid }}</span>
+				<button class="btn btn-sm" :disabled="loading" @click="refresh">Refresh</button>
 			</div>
 		</header>
 
 		<p v-if="error" class="alienhand-workbench__error">{{ error }}</p>
 
-		<section class="alienhand-workbench__directory" aria-label="AlienHand directory">
-			<div class="alienhand-workbench__directory-tabs" role="tablist">
-				<button
-					type="button"
-					role="tab"
-					:aria-selected="directoryTab === 'nicks'"
-					@click="directoryTab = 'nicks'"
-				>
-					Nicks
-				</button>
-				<button
-					type="button"
-					role="tab"
-					:aria-selected="directoryTab === 'chapters'"
-					@click="directoryTab = 'chapters'"
-				>
-					Chapters
-				</button>
-			</div>
-			<div v-if="directoryTab === 'nicks'" class="alienhand-workbench__directory-panel">
-				<span>{{ channel.users.length }} user{{ channel.users.length === 1 ? "" : "s" }}</span>
-				<ul>
-					<li v-for="user in channel.users" :key="user.nick">
-						<strong>{{ user.modes[0] || "" }}</strong>
-						{{ user.nick }}
-					</li>
-				</ul>
-			</div>
-			<div v-else class="alienhand-workbench__directory-panel">
-				<span>{{ chapters.length }} chapter{{ chapters.length === 1 ? "" : "s" }}</span>
-				<ul v-if="chapters.length">
-					<li v-for="chapter in chapters" :key="chapter.chapter_id">
-						<strong>{{ chapter.member_cut_ids.length }}</strong>
-						{{ chapter.title || chapter.chapter_id }}
-					</li>
-				</ul>
-				<p v-else>No chapters yet.</p>
-			</div>
-		</section>
-
-		<div
-			v-if="selectedSourceBlock"
-			class="alienhand-workbench__source-bridge"
-			aria-label="Selected source message for cuts"
-		>
-			<button
-				class="alienhand-workbench__source-arrow"
-				:disabled="pendingBlockId === selectedSourceBlock.block_id"
-				title="Insert selected message into cuts"
-				@click="insertSelectedSource"
-			>
-				&rarr;
-			</button>
-			<div class="alienhand-workbench__source-bubble">
-				<strong>@{{ selectedSourceBlock.sender }}</strong>
-				<span>{{ selectedSourceBlock.presentation }}</span>
-				<button
-					class="alienhand-workbench__remove"
-					title="Clear selected source"
-					@click="selectedSourceBlock = null"
-				>
-					x
-				</button>
-			</div>
-		</div>
-
-		<form class="alienhand-workbench__search" @submit.prevent="runSearch">
-			<input v-model="searchTerm" placeholder="Search raw blocks" />
-			<button class="btn btn-sm" :disabled="loading || !searchTerm.trim()">Search</button>
-		</form>
-
-		<div class="alienhand-workbench__panes">
-			<section v-if="showRawPane" class="alienhand-workbench__pane">
-				<header>
-					<h3>Chat</h3>
-					<span>{{ blocks.length }} blocks</span>
-				</header>
-				<p v-if="!blocks.length" class="alienhand-workbench__empty">
-					No persisted AlienHand blocks are available for this channel yet.
-				</p>
-				<article
-					v-for="block in blocks"
-					:id="sourceElementId('block', block.block_id)"
-					:key="block.block_id"
-					:class="[
-						'alienhand-workbench__card',
-						{'alienhand-workbench__card--hit': searchHitBlockIds.has(block.block_id)},
-						{
-							'alienhand-workbench__card--source-highlight':
-								highlightedBlockId === block.block_id,
-						},
-						{
-							'alienhand-workbench__card--bookmarked':
-								targetBookmarks('block', block.block_id).length,
-						},
-						{
-							'alienhand-workbench__card--sticky':
-								targetStickies('block', block.block_id).length,
-						},
-					]"
-				>
-					<div class="alienhand-workbench__meta">
-						<span>{{ block.sender }}</span>
-						<time>{{ formatTimestamp(block.created_at) }}</time>
-					</div>
-					<p>{{ block.presentation }}</p>
-					<div v-if="targetStickies('block', block.block_id).length" class="alienhand-workbench__stickies">
-						<span
-							v-for="sticky in targetStickies('block', block.block_id)"
-							:key="sticky.sticky_id"
-						>
-							Pinned reminder
-							<button class="btn btn-sm" @click="removeSticky(sticky)">
-								Unpin
-							</button>
-						</span>
-					</div>
-					<div v-if="targetBookmarks('block', block.block_id).length" class="alienhand-workbench__bookmarks">
-						<div
-							v-for="bookmark in targetBookmarks('block', block.block_id)"
-							:key="bookmark.bookmark_id"
-							:class="[
-								'alienhand-workbench__bookmark-chip',
-								{
-									'alienhand-workbench__bookmark-chip--sticky':
-										targetStickies('bookmark', bookmark.bookmark_id).length,
-								},
-							]"
-						>
-							Bookmark: {{ bookmark.note || bookmark.label || bookmark.bookmark_id }}
-							<span v-if="bookmark.note" class="alienhand-workbench__bookmark-popover">
-								{{ bookmark.note }}
-							</span>
-							<button
-								v-if="firstSticky('bookmark', bookmark.bookmark_id)"
-								class="btn btn-sm"
-								@click="removeFirstSticky('bookmark', bookmark.bookmark_id)"
-							>
-								Unpin
-							</button>
-							<button
-								v-else
-								class="btn btn-sm"
-								:disabled="!canCreateSticky('bookmark', bookmark.bookmark_id)"
-								@click="createSticky('bookmark', bookmark.bookmark_id)"
-							>
-								Pin
-							</button>
-						</div>
-					</div>
-					<div v-if="targetQuotes('block', block.block_id).length" class="alienhand-workbench__quotes">
-						<blockquote
-							v-for="quote in targetQuotes('block', block.block_id)"
-							:key="quote.quote_id"
-						>
-							{{ quote.excerpt }}
-						</blockquote>
-					</div>
-					<div class="alienhand-workbench__actions">
-						<button
-							class="btn btn-sm"
-							:disabled="pendingBlockId === block.block_id"
-							@click="createCut(block)"
-						>
-							Inject into cuts
-						</button>
-						<button
-							class="btn btn-sm"
-							:disabled="!canCreateSticky('block', block.block_id)"
-							@click="createSticky('block', block.block_id)"
-						>
-							Pin
-						</button>
-					</div>
-					<form
-						class="alienhand-workbench__bookmark-form"
-						@submit.prevent="createBookmark('block', block.block_id)"
+		<div class="alienhand-workbench__layout">
+			<aside class="alienhand-workbench__directory" aria-label="AlienHand directory">
+				<div class="alienhand-workbench__directory-tabs" role="tablist">
+					<button
+						type="button"
+						role="tab"
+						:aria-selected="directoryTab === 'nicks'"
+						@click="directoryTab = 'nicks'"
 					>
-						<input
-							v-model="bookmarkDrafts[bookmarkKey('block', block.block_id)]"
-							placeholder="Bookmark note"
-						/>
-						<button
-							class="btn btn-sm"
-							:disabled="!canCreateBookmark('block', block.block_id)"
-						>
-							Bookmark
-						</button>
-					</form>
-					<form
-						class="alienhand-workbench__quote-form"
-						@submit.prevent="createQuote('block', block.block_id)"
+						Nicks
+					</button>
+					<button
+						type="button"
+						role="tab"
+						:aria-selected="directoryTab === 'chapters'"
+						@click="directoryTab = 'chapters'"
 					>
-						<input
-							v-model="quoteDrafts[quoteKey('block', block.block_id)]"
-							placeholder="Quote excerpt"
-						/>
-						<button
-							class="btn btn-sm"
-							:disabled="!canCreateQuote('block', block.block_id)"
-						>
-							Quote
-						</button>
-					</form>
-				</article>
-			</section>
-
-			<section v-if="showCutsPane" class="alienhand-workbench__pane">
-				<header>
-					<h3>Cutting</h3>
-					<span>{{ activeCuts.length }} active</span>
-				</header>
-				<p class="alienhand-workbench__pointer">
-					Select a live chat line with its arrow, then use the bridge arrow to insert it here.
-				</p>
-				<div class="alienhand-workbench__insertion">
-					<label for="alienhand-cut-insertion">Insertion point</label>
-					<div>
-						<span class="alienhand-workbench__insertion-arrow">&rarr;</span>
-						<input
-							id="alienhand-cut-insertion"
-							v-model.number="insertionIndex"
-							type="range"
-							min="0"
-							:max="activeCuts.length"
-						/>
-					</div>
-					<span>{{ insertionLabel }}</span>
+						Chapters
+					</button>
 				</div>
-				<p v-if="!activeCuts.length" class="alienhand-workbench__empty">
-					Use "Inject into cuts" on a raw block to start composing.
-				</p>
-				<article
-					v-for="cut in activeCuts"
-					:id="sourceElementId('cut', cut.cut_id)"
-					:key="cut.cut_id"
-					:class="[
-						'alienhand-workbench__card',
-						{
-							'alienhand-workbench__card--source-highlight':
-								highlightedCutId === cut.cut_id,
-						},
-						{
-							'alienhand-workbench__card--bookmarked':
-								targetBookmarks('cut', cut.cut_id).length,
-						},
-						{
-							'alienhand-workbench__card--sticky':
-								targetStickies('cut', cut.cut_id).length,
-						},
-					]"
+				<div v-if="directoryTab === 'nicks'" class="alienhand-workbench__directory-panel">
+					<span
+						>{{ channel.users.length }} user{{
+							channel.users.length === 1 ? "" : "s"
+						}}</span
+					>
+					<ul>
+						<li v-for="user in channel.users" :key="user.nick">
+							<strong>{{ user.modes[0] || "" }}</strong>
+							{{ user.nick }}
+						</li>
+					</ul>
+				</div>
+				<div v-else class="alienhand-workbench__directory-panel">
+					<span>{{ chapters.length }} chapter{{ chapters.length === 1 ? "" : "s" }}</span>
+					<ul v-if="chapters.length">
+						<li v-for="chapter in chapters" :key="chapter.chapter_id">
+							<strong>{{ chapter.member_cut_ids.length }}</strong>
+							{{ chapter.title || chapter.chapter_id }}
+						</li>
+					</ul>
+					<p v-else>No chapters yet.</p>
+				</div>
+				<form class="alienhand-workbench__search" @submit.prevent="runSearch">
+					<input v-model="searchTerm" placeholder="Search stored blocks" />
+					<button class="btn btn-sm" :disabled="loading || !searchTerm.trim()">
+						Search
+					</button>
+				</form>
+			</aside>
+
+			<section
+				v-if="showRawPane"
+				class="alienhand-workbench__frame alienhand-workbench__frame--chat"
+			>
+				<header class="alienhand-workbench__frame-header">
+					<strong>Chat</strong>
+					<span>{{ channel.name }}</span>
+				</header>
+				<div class="alienhand-workbench__frame-body alienhand-workbench__frame-body--chat">
+					<slot name="chat" />
+				</div>
+				<div
+					v-if="selectedSourceBlock"
+					class="alienhand-workbench__source-dock"
+					aria-label="Selected source message for cuts"
 				>
-					<div class="alienhand-workbench__meta">
-						<span>Cut {{ cut.position + 1 }}</span>
+					<div class="alienhand-workbench__source-bubble">
+						<strong>@{{ selectedSourceBlock.sender }}</strong>
+						<span>{{ selectedSourceBlock.presentation }}</span>
 						<button
 							class="alienhand-workbench__remove"
-							:disabled="pendingCutId === cut.cut_id"
-							@click="removeCut(cut)"
+							title="Clear selected source"
+							@click="selectedSourceBlock = null"
 						>
 							x
 						</button>
 					</div>
-					<p>{{ blockById.get(cut.source_block_id)?.presentation || cut.source_block_id }}</p>
-					<div v-if="targetStickies('cut', cut.cut_id).length" class="alienhand-workbench__stickies">
-						<span
-							v-for="sticky in targetStickies('cut', cut.cut_id)"
-							:key="sticky.sticky_id"
-						>
-							Pinned reminder
-							<button class="btn btn-sm" @click="removeSticky(sticky)">
-								Unpin
-							</button>
-						</span>
-					</div>
-					<div v-if="targetBookmarks('cut', cut.cut_id).length" class="alienhand-workbench__bookmarks">
-						<div
-							v-for="bookmark in targetBookmarks('cut', cut.cut_id)"
-							:key="bookmark.bookmark_id"
-							:class="[
-								'alienhand-workbench__bookmark-chip',
-								{
-									'alienhand-workbench__bookmark-chip--sticky':
-										targetStickies('bookmark', bookmark.bookmark_id).length,
-								},
-							]"
-						>
-							Bookmark: {{ bookmark.note || bookmark.label || bookmark.bookmark_id }}
-							<span v-if="bookmark.note" class="alienhand-workbench__bookmark-popover">
-								{{ bookmark.note }}
-							</span>
-							<button
-								v-if="firstSticky('bookmark', bookmark.bookmark_id)"
-								class="btn btn-sm"
-								@click="removeFirstSticky('bookmark', bookmark.bookmark_id)"
-							>
-								Unpin
-							</button>
-							<button
-								v-else
-								class="btn btn-sm"
-								:disabled="!canCreateSticky('bookmark', bookmark.bookmark_id)"
-								@click="createSticky('bookmark', bookmark.bookmark_id)"
-							>
-								Pin
-							</button>
-						</div>
-					</div>
-					<div v-if="targetQuotes('cut', cut.cut_id).length" class="alienhand-workbench__quotes">
-						<blockquote
-							v-for="quote in targetQuotes('cut', cut.cut_id)"
-							:key="quote.quote_id"
-						>
-							{{ quote.excerpt }}
-						</blockquote>
-					</div>
-					<div class="alienhand-workbench__actions">
-						<button
-							class="btn btn-sm"
-							:disabled="!canCreateSticky('cut', cut.cut_id)"
-							@click="createSticky('cut', cut.cut_id)"
-						>
-							Pin
-						</button>
-					</div>
-					<form
-						class="alienhand-workbench__bookmark-form"
-						@submit.prevent="createBookmark('cut', cut.cut_id)"
-					>
-						<input
-							v-model="bookmarkDrafts[bookmarkKey('cut', cut.cut_id)]"
-							placeholder="Bookmark note"
-						/>
-						<button
-							class="btn btn-sm"
-							:disabled="!canCreateBookmark('cut', cut.cut_id)"
-						>
-							Bookmark
-						</button>
-					</form>
-					<form
-						class="alienhand-workbench__quote-form"
-						@submit.prevent="createQuote('cut', cut.cut_id)"
-					>
-						<input
-							v-model="quoteDrafts[quoteKey('cut', cut.cut_id)]"
-							placeholder="Quote excerpt"
-						/>
-						<button
-							class="btn btn-sm"
-							:disabled="!canCreateQuote('cut', cut.cut_id)"
-						>
-							Quote
-						</button>
-					</form>
-				</article>
-				<form class="alienhand-workbench__chapter-form" @submit.prevent="createChapter">
-					<input v-model="chapterTitle" placeholder="Chapter title" />
-					<textarea v-model="chapterSummary" placeholder="Chapter summary" rows="3" />
-					<button class="btn" :disabled="!activeCuts.length || loading">Create chapter</button>
-				</form>
+				</div>
 			</section>
 
-			<section v-if="showEditsPane" class="alienhand-workbench__pane">
-				<header>
-					<h3>Editing</h3>
-					<span>{{ chapters.length }} chapters / {{ edits.length }} edits</span>
-				</header>
-				<p v-if="!chapters.length" class="alienhand-workbench__empty">
-					Chapters created from cuts will appear here.
-				</p>
-				<div v-if="activeCuts.length" class="alienhand-workbench__editing-projection">
-					<header>
-						<strong>Editing text</strong>
-						<span>Click a line to reveal its source cut and chat block.</span>
-					</header>
-					<button
-						v-for="cut in activeCuts"
-						:key="`editing:${cut.cut_id}`"
-						type="button"
-						:class="[
-							'alienhand-workbench__editing-line',
-							{
-								'alienhand-workbench__editing-line--source-highlight':
-									highlightedEditCutId === cut.cut_id,
-							},
-						]"
-						@click="revealCutSource(cut)"
-					>
-						{{ blockById.get(cut.source_block_id)?.presentation || cut.source_block_id }}
-					</button>
-				</div>
-				<article
-					v-for="chapter in chapters"
-					:key="chapter.chapter_id"
-					:class="[
-						'alienhand-workbench__card',
-						{
-							'alienhand-workbench__card--bookmarked':
-								targetBookmarks('chapter', chapter.chapter_id).length,
-						},
-						{
-							'alienhand-workbench__card--sticky':
-								targetStickies('chapter', chapter.chapter_id).length,
-						},
-					]"
+			<div
+				v-if="showRawPane && showCutsPane"
+				class="alienhand-workbench__bridge-rail"
+				aria-label="Cut insertion bridge"
+			>
+				<button
+					type="button"
+					class="alienhand-workbench__bridge-arrow"
+					:disabled="
+						!selectedSourceBlock || pendingBlockId === selectedSourceBlock.block_id
+					"
+					:style="{top: `${bridgeY}px`}"
+					title="Drag to choose the cut insertion point. Click to insert the selected chat line."
+					@pointerdown="startBridgeDrag"
+					@click="insertFromBridge"
 				>
-					<div class="alienhand-workbench__meta">
-						<span>{{ chapter.member_cut_ids.length }} cuts</span>
-						<time>{{ formatTimestamp(chapter.updated_at) }}</time>
-					</div>
-					<h4>{{ chapter.title }}</h4>
-					<p>{{ chapter.summary || "No summary yet." }}</p>
+					&rarr;
+				</button>
+			</div>
+
+			<section
+				v-if="showCutsPane"
+				class="alienhand-workbench__frame alienhand-workbench__frame--cuts"
+			>
+				<header class="alienhand-workbench__frame-header">
+					<strong>Cutting</strong>
+					<span>{{ activeCuts.length }} active</span>
+				</header>
+				<div ref="cutScroller" class="alienhand-workbench__frame-body">
+					<p class="alienhand-workbench__pointer">
+						{{ insertionLabel }}. Select a chat line with its arrow, drag the bridge
+						arrow here, then click it to cut.
+					</p>
+					<p v-if="!activeCuts.length" class="alienhand-workbench__empty">
+						No cuts yet. Select a chat line, then use the bridge arrow between Chat and
+						Cutting.
+					</p>
 					<div
-						v-if="tocEntriesForTarget('chapter', chapter.chapter_id).length"
-						class="alienhand-workbench__toc"
+						v-if="!activeCuts.length || insertionPosition === 0"
+						class="alienhand-workbench__insertion-marker"
 					>
-						<span
-							v-for="entry in tocEntriesForTarget('chapter', chapter.chapter_id)"
-							:key="`${entry.toc_id}:${entry.ordinal}`"
-						>
-							TOC {{ entry.ordinal + 1 }}: {{ entry.title }}
-						</span>
+						<span>&rarr;</span>
+						Insert here
 					</div>
-					<div v-if="chapterEdits(chapter).length" class="alienhand-workbench__edits">
-						<section v-for="edit in chapterEdits(chapter)" :key="edit.edit_id">
-							<div>
-								<strong>{{ edit.edit_type }}</strong>
-								<span>{{ edit.author }}</span>
-							</div>
-							<p>{{ edit.reason || "No edit reason recorded." }}</p>
-							<pre
-								v-for="diff in editDiffsForEdit(edit.edit_id)"
-								:key="diff.diff_id"
-							>{{ formatJson(diff.content) }}</pre>
-						</section>
-					</div>
-					<div
-						v-if="targetStickies('chapter', chapter.chapter_id).length"
-						class="alienhand-workbench__stickies"
-					>
-						<span
-							v-for="sticky in targetStickies('chapter', chapter.chapter_id)"
-							:key="sticky.sticky_id"
-						>
-							Pinned reminder
-							<button class="btn btn-sm" @click="removeSticky(sticky)">
-								Unpin
-							</button>
-						</span>
-					</div>
-					<div
-						v-if="targetBookmarks('chapter', chapter.chapter_id).length"
-						class="alienhand-workbench__bookmarks"
-					>
-						<div
-							v-for="bookmark in targetBookmarks('chapter', chapter.chapter_id)"
-							:key="bookmark.bookmark_id"
+					<template v-for="(cut, index) in activeCuts" :key="cut.cut_id">
+						<article
+							:id="sourceElementId('cut', cut.cut_id)"
+							:data-cut-id="cut.cut_id"
 							:class="[
-								'alienhand-workbench__bookmark-chip',
+								'alienhand-workbench__card',
 								{
-									'alienhand-workbench__bookmark-chip--sticky':
-										targetStickies('bookmark', bookmark.bookmark_id).length,
+									'alienhand-workbench__card--source-highlight':
+										highlightedCutId === cut.cut_id,
+								},
+								{
+									'alienhand-workbench__card--bookmarked': targetBookmarks(
+										'cut',
+										cut.cut_id
+									).length,
+								},
+								{
+									'alienhand-workbench__card--sticky': targetStickies(
+										'cut',
+										cut.cut_id
+									).length,
 								},
 							]"
 						>
-							Bookmark: {{ bookmark.note || bookmark.label || bookmark.bookmark_id }}
-							<span v-if="bookmark.note" class="alienhand-workbench__bookmark-popover">
-								{{ bookmark.note }}
-							</span>
-							<button
-								v-if="firstSticky('bookmark', bookmark.bookmark_id)"
-								class="btn btn-sm"
-								@click="removeFirstSticky('bookmark', bookmark.bookmark_id)"
+							<div class="alienhand-workbench__meta">
+								<span>Cut {{ index + 1 }}</span>
+								<button
+									class="alienhand-workbench__remove"
+									:disabled="pendingCutId === cut.cut_id"
+									@click="removeCut(cut)"
+								>
+									x
+								</button>
+							</div>
+							<p>
+								{{
+									blockById.get(cut.source_block_id)?.presentation ||
+									cut.source_block_id
+								}}
+							</p>
+							<div
+								v-if="targetBookmarks('cut', cut.cut_id).length"
+								class="alienhand-workbench__bookmarks"
 							>
-								Unpin
-							</button>
+								<div
+									v-for="bookmark in targetBookmarks('cut', cut.cut_id)"
+									:key="bookmark.bookmark_id"
+									class="alienhand-workbench__bookmark-chip"
+								>
+									Bookmark:
+									{{ bookmark.note || bookmark.label || bookmark.bookmark_id }}
+									<span
+										v-if="bookmark.note"
+										class="alienhand-workbench__bookmark-popover"
+									>
+										{{ bookmark.note }}
+									</span>
+								</div>
+							</div>
+							<div class="alienhand-workbench__actions">
+								<button
+									class="btn btn-sm"
+									:disabled="!canCreateSticky('cut', cut.cut_id)"
+									@click="createSticky('cut', cut.cut_id)"
+								>
+									Pin
+								</button>
+							</div>
+							<form
+								class="alienhand-workbench__bookmark-form"
+								@submit.prevent="createBookmark('cut', cut.cut_id)"
+							>
+								<input
+									v-model="bookmarkDrafts[bookmarkKey('cut', cut.cut_id)]"
+									placeholder="Bookmark note"
+								/>
+								<button
+									class="btn btn-sm"
+									:disabled="!canCreateBookmark('cut', cut.cut_id)"
+								>
+									Bookmark
+								</button>
+							</form>
+						</article>
+						<div
+							v-if="insertionPosition === index + 1"
+							class="alienhand-workbench__insertion-marker"
+						>
+							<span>&rarr;</span>
+							Insert here
+						</div>
+					</template>
+					<form class="alienhand-workbench__chapter-form" @submit.prevent="createChapter">
+						<input v-model="chapterTitle" placeholder="Chapter title" />
+						<textarea v-model="chapterSummary" placeholder="Chapter summary" rows="3" />
+						<button class="btn" :disabled="!activeCuts.length || loading">
+							Create chapter
+						</button>
+					</form>
+				</div>
+			</section>
+
+			<section
+				v-if="showEditsPane"
+				class="alienhand-workbench__frame alienhand-workbench__frame--edits"
+			>
+				<header class="alienhand-workbench__frame-header">
+					<strong>Editing</strong>
+					<span>{{ chapters.length }} chapters / {{ edits.length }} edits</span>
+				</header>
+				<div class="alienhand-workbench__frame-body">
+					<p v-if="!activeCuts.length" class="alienhand-workbench__empty">
+						Editing text appears after cuts are created.
+					</p>
+					<div v-if="activeCuts.length" class="alienhand-workbench__editing-projection">
+						<button
+							v-for="cut in activeCuts"
+							:key="`editing:${cut.cut_id}`"
+							type="button"
+							:class="[
+								'alienhand-workbench__editing-line',
+								{
+									'alienhand-workbench__editing-line--source-highlight':
+										highlightedEditCutId === cut.cut_id,
+								},
+							]"
+							@click="revealCutSource(cut)"
+						>
+							{{
+								blockById.get(cut.source_block_id)?.presentation ||
+								cut.source_block_id
+							}}
+						</button>
+					</div>
+					<p v-if="!chapters.length" class="alienhand-workbench__empty">
+						Chapters created from cuts will appear here.
+					</p>
+					<article
+						v-for="chapter in chapters"
+						:key="chapter.chapter_id"
+						:class="[
+							'alienhand-workbench__card',
+							{
+								'alienhand-workbench__card--bookmarked': targetBookmarks(
+									'chapter',
+									chapter.chapter_id
+								).length,
+							},
+							{
+								'alienhand-workbench__card--sticky': targetStickies(
+									'chapter',
+									chapter.chapter_id
+								).length,
+							},
+						]"
+					>
+						<div class="alienhand-workbench__meta">
+							<span>{{ chapter.member_cut_ids.length }} cuts</span>
+							<time>{{ formatTimestamp(chapter.updated_at) }}</time>
+						</div>
+						<h4>{{ chapter.title }}</h4>
+						<p>{{ chapter.summary || "No summary yet." }}</p>
+						<div
+							v-if="tocEntriesForTarget('chapter', chapter.chapter_id).length"
+							class="alienhand-workbench__toc"
+						>
+							<span
+								v-for="entry in tocEntriesForTarget('chapter', chapter.chapter_id)"
+								:key="`${entry.toc_id}:${entry.ordinal}`"
+							>
+								TOC {{ entry.ordinal + 1 }}: {{ entry.title }}
+							</span>
+						</div>
+						<div v-if="chapterEdits(chapter).length" class="alienhand-workbench__edits">
+							<section v-for="edit in chapterEdits(chapter)" :key="edit.edit_id">
+								<div>
+									<strong>{{ edit.edit_type }}</strong>
+									<span>{{ edit.author }}</span>
+								</div>
+								<p>{{ edit.reason || "No edit reason recorded." }}</p>
+								<pre
+									v-for="diff in editDiffsForEdit(edit.edit_id)"
+									:key="diff.diff_id"
+									>{{ formatJson(diff.content) }}</pre
+								>
+							</section>
+						</div>
+						<div class="alienhand-workbench__actions">
 							<button
-								v-else
 								class="btn btn-sm"
-								:disabled="!canCreateSticky('bookmark', bookmark.bookmark_id)"
-								@click="createSticky('bookmark', bookmark.bookmark_id)"
+								:disabled="!canCreateSticky('chapter', chapter.chapter_id)"
+								@click="createSticky('chapter', chapter.chapter_id)"
 							>
 								Pin
 							</button>
+							<button
+								class="btn btn-sm"
+								:disabled="!canCreateTocEntry(chapter)"
+								@click="createTocEntry(chapter)"
+							>
+								Add TOC
+							</button>
 						</div>
-					</div>
-					<div
-						v-if="targetQuotes('chapter', chapter.chapter_id).length"
-						class="alienhand-workbench__quotes"
-					>
-						<blockquote
-							v-for="quote in targetQuotes('chapter', chapter.chapter_id)"
-							:key="quote.quote_id"
+						<form
+							class="alienhand-workbench__edit-form"
+							@submit.prevent="createChapterEdit(chapter)"
 						>
-							{{ quote.excerpt }}
-						</blockquote>
-					</div>
-					<div class="alienhand-workbench__actions">
-						<button
-							class="btn btn-sm"
-							:disabled="!canCreateSticky('chapter', chapter.chapter_id)"
-							@click="createSticky('chapter', chapter.chapter_id)"
-						>
-							Pin
-						</button>
-						<button
-							class="btn btn-sm"
-							:disabled="!canCreateTocEntry(chapter)"
-							@click="createTocEntry(chapter)"
-						>
-							Add TOC
-						</button>
-					</div>
-					<form
-						class="alienhand-workbench__bookmark-form"
-						@submit.prevent="createBookmark('chapter', chapter.chapter_id)"
-					>
-						<input
-							v-model="bookmarkDrafts[bookmarkKey('chapter', chapter.chapter_id)]"
-							placeholder="Bookmark note"
-						/>
-						<button
-							class="btn btn-sm"
-							:disabled="!canCreateBookmark('chapter', chapter.chapter_id)"
-						>
-							Bookmark
-						</button>
-					</form>
-					<form
-						class="alienhand-workbench__quote-form"
-						@submit.prevent="createQuote('chapter', chapter.chapter_id)"
-					>
-						<input
-							v-model="quoteDrafts[quoteKey('chapter', chapter.chapter_id)]"
-							placeholder="Quote excerpt"
-						/>
-						<button
-							class="btn btn-sm"
-							:disabled="!canCreateQuote('chapter', chapter.chapter_id)"
-						>
-							Quote
-						</button>
-					</form>
-					<form
-						class="alienhand-workbench__edit-form"
-						@submit.prevent="createChapterEdit(chapter)"
-					>
-						<textarea
-							v-model="editDrafts[editDraftKey(chapter.chapter_id)]"
-							placeholder="Editorial edit note"
-							rows="3"
-						/>
-						<button
-							class="btn btn-sm"
-							:disabled="!canCreateChapterEdit(chapter)"
-						>
-							Apply edit
-						</button>
-					</form>
-				</article>
+							<textarea
+								v-model="editDrafts[editDraftKey(chapter.chapter_id)]"
+								placeholder="Editorial edit note"
+								rows="3"
+							/>
+							<button class="btn btn-sm" :disabled="!canCreateChapterEdit(chapter)">
+								Apply edit
+							</button>
+						</form>
+					</article>
+				</div>
 			</section>
 		</div>
 
@@ -590,7 +388,7 @@
 			</button>
 			<pre v-if="showRawText">{{ rawDebugText }}</pre>
 		</footer>
-	</aside>
+	</section>
 </template>
 
 <script lang="ts">
@@ -675,6 +473,11 @@ export default defineComponent({
 		const highlightedCutId = ref("");
 		const highlightedEditCutId = ref("");
 		const directoryTab = ref<"nicks" | "chapters">("nicks");
+		const cutScroller = ref<HTMLElement | null>(null);
+		const bridgeY = ref(520);
+		const bridgeDragged = ref(false);
+		const bridgeDragStartY = ref(0);
+		const bridgeDragStartTop = ref(520);
 
 		const channelUuid = computed(() => alienHandChannelUuidFromName(props.channel.name));
 		const activeCuts = computed(() => cuts.value.filter((cut) => cut.status === "active"));
@@ -689,8 +492,7 @@ export default defineComponent({
 		const blockById = computed(
 			() => new Map(blocks.value.map((block) => [block.block_id, block]))
 		);
-		const targetKey = (targetType: string, targetId: string) =>
-			`${targetType}:${targetId}`;
+		const targetKey = (targetType: string, targetId: string) => `${targetType}:${targetId}`;
 		const bookmarkKey = (targetType: AlienHandRefinementTargetType, targetId: string) =>
 			targetKey(targetType, targetId);
 		const quoteKey = (sourceType: AlienHandRefinementTargetType, sourceId: string) =>
@@ -881,6 +683,66 @@ export default defineComponent({
 			}
 		};
 
+		const insertFromBridge = async (event: MouseEvent) => {
+			if (bridgeDragged.value) {
+				event.preventDefault();
+				return;
+			}
+
+			await insertSelectedSource();
+		};
+
+		const updateInsertionFromClientY = (clientY: number) => {
+			const cutCards = Array.from(
+				cutScroller.value?.querySelectorAll<HTMLElement>("[data-cut-id]") || []
+			);
+			let nextIndex = cutCards.length;
+
+			for (const [index, card] of cutCards.entries()) {
+				const rect = card.getBoundingClientRect();
+
+				if (clientY < rect.top + rect.height / 2) {
+					nextIndex = index;
+					break;
+				}
+			}
+
+			insertionIndex.value = nextIndex;
+		};
+
+		const startBridgeDrag = (event: PointerEvent) => {
+			const target = event.currentTarget as HTMLElement;
+			const railHeight = target.parentElement?.clientHeight || window.innerHeight;
+			const minY = 30;
+			const maxY = Math.max(minY, railHeight - 54);
+			bridgeDragStartY.value = event.clientY;
+			bridgeDragStartTop.value = bridgeY.value;
+			bridgeDragged.value = false;
+			target.setPointerCapture(event.pointerId);
+
+			const moveBridge = (moveEvent: PointerEvent) => {
+				const delta = moveEvent.clientY - bridgeDragStartY.value;
+				bridgeY.value = Math.min(Math.max(bridgeDragStartTop.value + delta, minY), maxY);
+
+				if (Math.abs(delta) > 4) {
+					bridgeDragged.value = true;
+				}
+
+				updateInsertionFromClientY(moveEvent.clientY);
+			};
+
+			const stopBridge = () => {
+				window.removeEventListener("pointermove", moveBridge);
+				window.setTimeout(() => {
+					bridgeDragged.value = false;
+				}, 0);
+			};
+
+			window.addEventListener("pointermove", moveBridge);
+			window.addEventListener("pointerup", stopBridge, {once: true});
+			updateInsertionFromClientY(event.clientY);
+		};
+
 		const removeCut = async (cut: AlienHandConversationCut) => {
 			pendingCutId.value = cut.cut_id;
 			error.value = "";
@@ -957,6 +819,12 @@ export default defineComponent({
 		const sourceElementId = (sourceType: "block" | "cut", sourceId: string) =>
 			`alienhand-${sourceType}-${sourceId.replace(/[^a-z0-9_-]/gi, "_")}`;
 
+		const sourceBlockElementId = (sourceId: string) => {
+			const match = /^thelounge:[^:]+:(\d+)$/.exec(sourceId);
+
+			return match ? `msg-${match[1]}` : sourceElementId("block", sourceId);
+		};
+
 		const canCreateBookmark = (targetType: AlienHandRefinementTargetType, targetId: string) => {
 			const key = bookmarkKey(targetType, targetId);
 			return Boolean(bookmarkDrafts.value[key]?.trim()) && pendingBookmarkKey.value !== key;
@@ -974,14 +842,20 @@ export default defineComponent({
 
 		const canCreateChapterEdit = (chapter: AlienHandConversationChapter) => {
 			const key = editDraftKey(chapter.chapter_id);
-			return Boolean(editDrafts.value[key]?.trim()) && pendingEditChapterId.value !== chapter.chapter_id;
+			return (
+				Boolean(editDrafts.value[key]?.trim()) &&
+				pendingEditChapterId.value !== chapter.chapter_id
+			);
 		};
 
 		const canCreateTocEntry = (chapter: AlienHandConversationChapter) =>
 			!tocEntriesForTarget("chapter", chapter.chapter_id).length &&
 			pendingTocChapterId.value !== chapter.chapter_id;
 
-		const createBookmark = async (targetType: AlienHandRefinementTargetType, targetId: string) => {
+		const createBookmark = async (
+			targetType: AlienHandRefinementTargetType,
+			targetId: string
+		) => {
 			const key = bookmarkKey(targetType, targetId);
 			const note = bookmarkDrafts.value[key]?.trim() || "";
 
@@ -994,7 +868,12 @@ export default defineComponent({
 			error.value = "";
 
 			try {
-				await createAlienHandRefinementBookmark(targetType, targetId, "Workbench bookmark", note);
+				await createAlienHandRefinementBookmark(
+					targetType,
+					targetId,
+					"Workbench bookmark",
+					note
+				);
 				delete bookmarkDrafts.value[key];
 				await refresh();
 			} catch (caught) {
@@ -1060,7 +939,10 @@ export default defineComponent({
 			}
 		};
 
-		const removeFirstSticky = async (targetType: AlienHandStickyTargetType, targetId: string) => {
+		const removeFirstSticky = async (
+			targetType: AlienHandStickyTargetType,
+			targetId: string
+		) => {
 			const sticky = firstSticky(targetType, targetId);
 
 			if (sticky) {
@@ -1140,12 +1022,24 @@ export default defineComponent({
 
 		const formatJson = (value: unknown) => JSON.stringify(value, null, 2);
 
+		const pulseSourceElement = (element: HTMLElement) => {
+			element.classList.add("alienhand-workbench__message-source-highlight");
+			window.setTimeout(() => {
+				element.classList.remove("alienhand-workbench__message-source-highlight");
+			}, 1800);
+		};
+
 		const scrollSourceIntoView = (sourceType: "block" | "cut", sourceId: string) => {
 			window.requestAnimationFrame(() => {
-				const element = document.getElementById(sourceElementId(sourceType, sourceId));
+				const element = document.getElementById(
+					sourceType === "block"
+						? sourceBlockElementId(sourceId)
+						: sourceElementId(sourceType, sourceId)
+				);
 
 				if (element) {
 					element.scrollIntoView({behavior: "smooth", block: "center"});
+					pulseSourceElement(element);
 				}
 			});
 		};
@@ -1232,6 +1126,7 @@ export default defineComponent({
 			chapterSummary,
 			chapterTitle,
 			chapters,
+			bridgeY,
 			createBookmark,
 			createChapter,
 			createChapterEdit,
@@ -1240,6 +1135,7 @@ export default defineComponent({
 			createSticky,
 			createTocEntry,
 			cuts,
+			cutScroller,
 			directoryTab,
 			editDiffs,
 			editDiffsForEdit,
@@ -1256,6 +1152,7 @@ export default defineComponent({
 			insertionIndex,
 			insertionLabel,
 			insertSelectedSource,
+			insertFromBridge,
 			loading,
 			pendingBlockId,
 			pendingCutId,
@@ -1279,6 +1176,7 @@ export default defineComponent({
 			showRawPane,
 			showRawText,
 			sourceElementId,
+			startBridgeDrag,
 			stickies,
 			targetBookmarks,
 			targetQuotes,
