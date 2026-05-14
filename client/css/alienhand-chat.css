@@ -315,6 +315,47 @@
 	font-size: 0.76rem;
 }
 
+#chat .alienhand-workbench__insertion {
+	background: #fffdf8;
+	border: 2px solid #20292f;
+	border-radius: 10px;
+	display: grid;
+	gap: 0.35rem;
+	margin: 0.45rem 0 0.65rem;
+	padding: 0.55rem;
+}
+
+#chat .alienhand-workbench__insertion label,
+#chat .alienhand-workbench__insertion > span {
+	color: var(--alienhand-muted);
+	font-size: 0.76rem;
+	font-weight: 700;
+}
+
+#chat .alienhand-workbench__insertion div {
+	align-items: center;
+	display: grid;
+	gap: 0.45rem;
+	grid-template-columns: auto minmax(0, 1fr);
+}
+
+#chat .alienhand-workbench__insertion input {
+	accent-color: var(--alienhand-link);
+	width: 100%;
+}
+
+#chat .alienhand-workbench__insertion-arrow {
+	align-items: center;
+	background: var(--alienhand-link);
+	border-radius: 999px;
+	color: #fff;
+	display: inline-flex;
+	font-weight: 900;
+	height: 1.75rem;
+	justify-content: center;
+	width: 1.75rem;
+}
+
 #chat .alienhand-workbench__card {
 	background: var(--alienhand-workbench-card);
 	border: 1px solid var(--alienhand-border);

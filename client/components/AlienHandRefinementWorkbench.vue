@@ -196,6 +196,20 @@
 				<p class="alienhand-workbench__pointer">
 					Select a live chat line with its arrow, then use the bridge arrow to insert it here.
 				</p>
+				<div class="alienhand-workbench__insertion">
+					<label for="alienhand-cut-insertion">Insertion point</label>
+					<div>
+						<span class="alienhand-workbench__insertion-arrow">&rarr;</span>
+						<input
+							id="alienhand-cut-insertion"
+							v-model.number="insertionIndex"
+							type="range"
+							min="0"
+							:max="activeCuts.length"
+						/>
+					</div>
+					<span>{{ insertionLabel }}</span>
+				</div>
 				<p v-if="!activeCuts.length" class="alienhand-workbench__empty">
 					Use "Inject into cuts" on a raw block to start composing.
 				</p>
@@ -612,6 +626,7 @@ export default defineComponent({
 		const searchHitBlockIds = ref(new Set<string>());
 		const chapterTitle = ref("");
 		const chapterSummary = ref("");
+		const insertionIndex = ref(0);
 		const showRawPane = ref(true);
 		const showCutsPane = ref(true);
 		const showEditsPane = ref(true);
@@ -622,6 +637,14 @@ export default defineComponent({
 
 		const channelUuid = computed(() => alienHandChannelUuidFromName(props.channel.name));
 		const activeCuts = computed(() => cuts.value.filter((cut) => cut.status === "active"));
+		const insertionPosition = computed(() =>
+			Math.min(Math.max(insertionIndex.value, 0), activeCuts.value.length)
+		);
+		const insertionLabel = computed(() =>
+			insertionPosition.value === activeCuts.value.length
+				? "end of Cutting"
+				: `before cut ${insertionPosition.value + 1}`
+		);
 		const blockById = computed(
 			() => new Map(blocks.value.map((block) => [block.block_id, block]))
 		);
@@ -781,7 +804,9 @@ export default defineComponent({
 			error.value = "";
 
 			try {
-				await createAlienHandRefinementCut(block.block_id);
+				const position = insertionPosition.value;
+				await createAlienHandRefinementCut(block.block_id, position);
+				insertionIndex.value = position + 1;
 				await refresh();
 			} catch (caught) {
 				error.value = caught instanceof Error ? caught.message : String(caught);
@@ -803,7 +828,9 @@ export default defineComponent({
 
 			try {
 				const storedBlock = await createAlienHandRefinementBlock(sourceBlock);
-				await createAlienHandRefinementCut(storedBlock.block_id, activeCuts.value.length);
+				const position = insertionPosition.value;
+				await createAlienHandRefinementCut(storedBlock.block_id, position);
+				insertionIndex.value = position + 1;
 				selectedSourceBlock.value = null;
 				await refresh();
 			} catch (caught) {
@@ -1128,6 +1155,7 @@ export default defineComponent({
 				bookmarkDrafts.value = {};
 				quoteDrafts.value = {};
 				editDrafts.value = {};
+				insertionIndex.value = 0;
 				searchHitBlockIds.value = new Set();
 				highlightedBlockId.value = "";
 				highlightedCutId.value = "";
@@ -1135,6 +1163,15 @@ export default defineComponent({
 				await refresh();
 			},
 			{immediate: true}
+		);
+
+		watch(
+			() => activeCuts.value.length,
+			(count) => {
+				if (insertionIndex.value > count) {
+					insertionIndex.value = count;
+				}
+			}
 		);
 
 		return {
@@ -1174,6 +1211,8 @@ export default defineComponent({
 			highlightedBlockId,
 			highlightedCutId,
 			highlightedEditCutId,
+			insertionIndex,
+			insertionLabel,
 			insertSelectedSource,
 			loading,
 			pendingBlockId,
