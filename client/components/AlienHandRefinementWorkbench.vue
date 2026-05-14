@@ -627,11 +627,21 @@
 			<button class="btn btn-sm" @click="showRawText = !showRawText">
 				{{ showRawText ? "Hide" : "Show" }} raw text
 			</button>
+			<button
+				v-if="showRawText"
+				class="btn btn-sm"
+				type="button"
+				:aria-pressed="trackRawText"
+				@click="toggleRawTextTracking"
+			>
+				{{ trackRawText ? "Stop tracking raw text" : "Track raw text" }}
+			</button>
 			<p class="alienhand-workbench__shortcuts">
 				Keyboard shortcuts: Ctrl+Alt+1 Chat, Ctrl+Alt+2 Cutting, Ctrl+Alt+3 Editing,
-				Ctrl+Alt+R raw text, Ctrl+Alt+H history, Ctrl+Alt+Enter insert selected source.
+				Ctrl+Alt+R raw text, Ctrl+Alt+T raw tracking, Ctrl+Alt+H history, Ctrl+Alt+Enter
+				insert selected source.
 			</p>
-			<pre v-if="showRawText">{{ rawDebugText }}</pre>
+			<pre v-if="showRawText" ref="rawTextOutput">{{ rawDebugText }}</pre>
 		</footer>
 	</section>
 </template>
@@ -722,6 +732,7 @@ export default defineComponent({
 		const showCutsPane = ref(true);
 		const showEditsPane = ref(true);
 		const showRawText = ref(false);
+		const trackRawText = ref(true);
 		const highlightedBlockId = ref("");
 		const highlightedCutId = ref("");
 		const highlightedEditCutId = ref("");
@@ -729,6 +740,7 @@ export default defineComponent({
 		const directoryTab = ref<"nicks" | "chapters">("nicks");
 		const cutScroller = ref<HTMLElement | null>(null);
 		const bridgeRail = ref<HTMLElement | null>(null);
+		const rawTextOutput = ref<HTMLElement | null>(null);
 		const bridgeY = ref(520);
 		const bridgeDragging = ref(false);
 		const bridgeDragged = ref(false);
@@ -738,6 +750,7 @@ export default defineComponent({
 		const directiveSyncStatus = ref("");
 		const historyStatus = ref("");
 		const keyboardShortcutStatus = ref("");
+		const rawTextStatus = ref("");
 		let directivePollTimer: ReturnType<typeof window.setInterval> | null = null;
 
 		const channelUuid = computed(() => alienHandChannelUuidFromName(props.channel.name));
@@ -821,6 +834,10 @@ export default defineComponent({
 
 			if (keyboardShortcutStatus.value) {
 				items.push({kind: "info", text: keyboardShortcutStatus.value});
+			}
+
+			if (rawTextStatus.value) {
+				items.push({kind: "info", text: rawTextStatus.value});
 			}
 
 			if (error.value) {
@@ -913,6 +930,26 @@ export default defineComponent({
 				2
 			)
 		);
+
+		const syncRawTextTracking = () => {
+			if (!showRawText.value || !trackRawText.value) {
+				return;
+			}
+
+			window.requestAnimationFrame(() => {
+				if (rawTextOutput.value) {
+					rawTextOutput.value.scrollTop = rawTextOutput.value.scrollHeight;
+				}
+			});
+		};
+
+		const toggleRawTextTracking = () => {
+			trackRawText.value = !trackRawText.value;
+			rawTextStatus.value = trackRawText.value
+				? "Raw text tracking is on."
+				: "Raw text tracking is off.";
+			syncRawTextTracking();
+		};
 
 		const refresh = async () => {
 			if (!channelUuid.value) {
@@ -1138,6 +1175,11 @@ export default defineComponent({
 				keyboardShortcutStatus.value = `Ctrl+Alt+R toggled raw text ${
 					showRawText.value ? "on" : "off"
 				}.`;
+				syncRawTextTracking();
+			} else if (key === "t") {
+				event.preventDefault();
+				keyboardShortcutStatus.value = "Ctrl+Alt+T toggled raw text tracking.";
+				toggleRawTextTracking();
 			} else if (key === "h") {
 				event.preventDefault();
 				keyboardShortcutStatus.value = "Ctrl+Alt+H requested channel history.";
@@ -1731,9 +1773,17 @@ export default defineComponent({
 				sourceRevealStatus.value = "";
 				historyStatus.value = "";
 				keyboardShortcutStatus.value = "";
+				rawTextStatus.value = "";
 				await refresh();
 			},
 			{immediate: true}
+		);
+
+		watch(
+			() => [rawDebugText.value, showRawText.value, trackRawText.value],
+			() => {
+				syncRawTextTracking();
+			}
 		);
 
 		watch(
@@ -1827,6 +1877,8 @@ export default defineComponent({
 			quoteKey,
 			quotes,
 			rawDebugText,
+			rawTextOutput,
+			rawTextStatus,
 			refresh,
 			removeCut,
 			removeFirstSticky,
@@ -1852,8 +1904,10 @@ export default defineComponent({
 			targetBookmarks,
 			targetQuotes,
 			targetStickies,
+			toggleRawTextTracking,
 			tocEntries,
 			tocEntriesForTarget,
+			trackRawText,
 			workbenchStatusItems,
 		};
 	},
