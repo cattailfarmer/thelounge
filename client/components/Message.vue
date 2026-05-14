@@ -23,6 +23,7 @@
 			v-if="alienHandSourceAvailable"
 			class="alienhand-source-arrow"
 			type="button"
+			aria-label="Stage this message for cuts"
 			title="Stage this message for cuts"
 			@click.stop="selectAlienHandSource"
 		>
@@ -111,7 +112,10 @@ import dayjs from "dayjs";
 
 import constants from "../js/constants";
 import eventbus from "../js/eventbus";
-import {alienHandChannelUuidFromName, type AlienHandConversationBlockInput} from "../js/helpers/alienhand";
+import {
+	alienHandChannelUuidFromName,
+	type AlienHandConversationBlockInput,
+} from "../js/helpers/alienhand";
 import localetime from "../js/helpers/localetime";
 import Username from "./Username.vue";
 import LinkPreview from "./LinkPreview.vue";

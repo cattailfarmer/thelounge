@@ -9,6 +9,7 @@
 				<button
 					type="button"
 					:aria-pressed="showRawPane"
+					aria-label="Show or hide Chat frame"
 					@click="showRawPane = !showRawPane"
 				>
 					Chat
@@ -16,6 +17,7 @@
 				<button
 					type="button"
 					:aria-pressed="showCutsPane"
+					aria-label="Show or hide Cutting frame"
 					@click="showCutsPane = !showCutsPane"
 				>
 					Cutting
@@ -23,6 +25,7 @@
 				<button
 					type="button"
 					:aria-pressed="showEditsPane"
+					aria-label="Show or hide Editing frame"
 					@click="showEditsPane = !showEditsPane"
 				>
 					Editing
@@ -117,6 +120,7 @@
 						<span>{{ selectedSourceBlock.presentation }}</span>
 						<button
 							class="alienhand-workbench__remove"
+							aria-label="Clear selected source"
 							title="Clear selected source"
 							@click="selectedSourceBlock = null"
 						>
@@ -135,6 +139,7 @@
 				<button
 					type="button"
 					class="alienhand-workbench__bridge-arrow"
+					aria-label="Insert selected source at current Cutting position"
 					:disabled="
 						!selectedSourceBlock || pendingBlockId === selectedSourceBlock.block_id
 					"
@@ -145,6 +150,28 @@
 				>
 					&rarr;
 				</button>
+				<div class="alienhand-workbench__bridge-steps">
+					<button
+						type="button"
+						class="alienhand-workbench__bridge-step"
+						:disabled="insertionPosition <= 0"
+						aria-label="Move cut insertion up"
+						title="Move cut insertion up"
+						@click="moveInsertion(-1)"
+					>
+						&uarr;
+					</button>
+					<button
+						type="button"
+						class="alienhand-workbench__bridge-step"
+						:disabled="insertionPosition >= activeCuts.length"
+						aria-label="Move cut insertion down"
+						title="Move cut insertion down"
+						@click="moveInsertion(1)"
+					>
+						&darr;
+					</button>
+				</div>
 			</div>
 
 			<section
@@ -204,6 +231,7 @@
 								<span>Cut {{ index + 1 }}</span>
 								<button
 									class="alienhand-workbench__remove"
+									:aria-label="`Remove cut ${index + 1}`"
 									:disabled="pendingCutId === cut.cut_id"
 									@click="removeCut(cut)"
 								>
@@ -287,6 +315,7 @@
 							:key="`removed:${cut.cut_id}`"
 							type="button"
 							class="alienhand-workbench__removed-cut"
+							:aria-label="`Reveal source for removed cut ${cut.cut_id}`"
 							@click="revealCutSource(cut)"
 						>
 							<span>Removed cut</span>
@@ -326,6 +355,7 @@
 										highlightedEditCutId === cut.cut_id,
 								},
 							]"
+							:aria-label="`Reveal source for ${cutSourcePresentation(cut)}`"
 							@click="revealCutSource(cut)"
 						>
 							<span
@@ -844,6 +874,15 @@ export default defineComponent({
 			});
 		};
 
+		const moveInsertion = (delta: number) => {
+			insertionIndex.value = Math.min(
+				Math.max(insertionPosition.value + delta, 0),
+				activeCuts.value.length
+			);
+			sourceRevealStatus.value = `Insertion position moved to ${insertionLabel.value}.`;
+			syncBridgeToInsertionMarker();
+		};
+
 		const startBridgeDrag = (event: PointerEvent) => {
 			const target = event.currentTarget as HTMLElement;
 			bridgeDragStartY.value = event.clientY;
@@ -1360,6 +1399,7 @@ export default defineComponent({
 			insertSelectedSource,
 			insertFromBridge,
 			loading,
+			moveInsertion,
 			pendingBlockId,
 			pendingCutId,
 			pendingEditChapterId,
