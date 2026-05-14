@@ -266,6 +266,35 @@
 									</span>
 								</div>
 							</div>
+							<div
+								v-if="targetQuotes('cut', cut.cut_id).length"
+								class="alienhand-workbench__quotes"
+							>
+								<blockquote
+									v-for="quote in targetQuotes('cut', cut.cut_id)"
+									:key="quote.quote_id"
+								>
+									{{ quote.excerpt }}
+								</blockquote>
+							</div>
+							<div
+								v-if="targetStickies('cut', cut.cut_id).length"
+								class="alienhand-workbench__stickies"
+							>
+								<span
+									v-for="sticky in targetStickies('cut', cut.cut_id)"
+									:key="sticky.sticky_id"
+								>
+									Pinned reminder
+									<button
+										type="button"
+										:aria-label="`Unpin cut reminder ${sticky.sticky_id}`"
+										@click="removeSticky(sticky)"
+									>
+										Unpin
+									</button>
+								</span>
+							</div>
 							<div class="alienhand-workbench__actions">
 								<button
 									class="btn btn-sm"
@@ -273,6 +302,13 @@
 									@click="createSticky('cut', cut.cut_id)"
 								>
 									Pin
+								</button>
+								<button
+									v-if="targetStickies('cut', cut.cut_id).length"
+									class="btn btn-sm"
+									@click="removeFirstSticky('cut', cut.cut_id)"
+								>
+									Unpin
 								</button>
 							</div>
 							<form
@@ -288,6 +324,21 @@
 									:disabled="!canCreateBookmark('cut', cut.cut_id)"
 								>
 									Bookmark
+								</button>
+							</form>
+							<form
+								class="alienhand-workbench__quote-form"
+								@submit.prevent="createQuote('cut', cut.cut_id)"
+							>
+								<input
+									v-model="quoteDrafts[quoteKey('cut', cut.cut_id)]"
+									placeholder="Quote excerpt"
+								/>
+								<button
+									class="btn btn-sm"
+									:disabled="!canCreateQuote('cut', cut.cut_id)"
+								>
+									Quote
 								</button>
 							</form>
 						</article>
@@ -404,6 +455,54 @@
 								TOC {{ entry.ordinal + 1 }}: {{ entry.title }}
 							</span>
 						</div>
+						<div
+							v-if="targetBookmarks('chapter', chapter.chapter_id).length"
+							class="alienhand-workbench__bookmarks"
+						>
+							<div
+								v-for="bookmark in targetBookmarks('chapter', chapter.chapter_id)"
+								:key="bookmark.bookmark_id"
+								class="alienhand-workbench__bookmark-chip"
+							>
+								Bookmark:
+								{{ bookmark.note || bookmark.label || bookmark.bookmark_id }}
+								<span
+									v-if="bookmark.note"
+									class="alienhand-workbench__bookmark-popover"
+								>
+									{{ bookmark.note }}
+								</span>
+							</div>
+						</div>
+						<div
+							v-if="targetQuotes('chapter', chapter.chapter_id).length"
+							class="alienhand-workbench__quotes"
+						>
+							<blockquote
+								v-for="quote in targetQuotes('chapter', chapter.chapter_id)"
+								:key="quote.quote_id"
+							>
+								{{ quote.excerpt }}
+							</blockquote>
+						</div>
+						<div
+							v-if="targetStickies('chapter', chapter.chapter_id).length"
+							class="alienhand-workbench__stickies"
+						>
+							<span
+								v-for="sticky in targetStickies('chapter', chapter.chapter_id)"
+								:key="sticky.sticky_id"
+							>
+								Pinned reminder
+								<button
+									type="button"
+									:aria-label="`Unpin chapter reminder ${sticky.sticky_id}`"
+									@click="removeSticky(sticky)"
+								>
+									Unpin
+								</button>
+							</span>
+						</div>
 						<div v-if="chapterEdits(chapter).length" class="alienhand-workbench__edits">
 							<section v-for="edit in chapterEdits(chapter)" :key="edit.edit_id">
 								<div>
@@ -427,6 +526,13 @@
 								Pin
 							</button>
 							<button
+								v-if="targetStickies('chapter', chapter.chapter_id).length"
+								class="btn btn-sm"
+								@click="removeFirstSticky('chapter', chapter.chapter_id)"
+							>
+								Unpin
+							</button>
+							<button
 								class="btn btn-sm"
 								:disabled="!canCreateTocEntry(chapter)"
 								@click="createTocEntry(chapter)"
@@ -445,6 +551,36 @@
 							/>
 							<button class="btn btn-sm" :disabled="!canCreateChapterEdit(chapter)">
 								Apply edit
+							</button>
+						</form>
+						<form
+							class="alienhand-workbench__bookmark-form"
+							@submit.prevent="createBookmark('chapter', chapter.chapter_id)"
+						>
+							<input
+								v-model="bookmarkDrafts[bookmarkKey('chapter', chapter.chapter_id)]"
+								placeholder="Bookmark note"
+							/>
+							<button
+								class="btn btn-sm"
+								:disabled="!canCreateBookmark('chapter', chapter.chapter_id)"
+							>
+								Bookmark
+							</button>
+						</form>
+						<form
+							class="alienhand-workbench__quote-form"
+							@submit.prevent="createQuote('chapter', chapter.chapter_id)"
+						>
+							<input
+								v-model="quoteDrafts[quoteKey('chapter', chapter.chapter_id)]"
+								placeholder="Quote excerpt"
+							/>
+							<button
+								class="btn btn-sm"
+								:disabled="!canCreateQuote('chapter', chapter.chapter_id)"
+							>
+								Quote
 							</button>
 						</form>
 					</article>

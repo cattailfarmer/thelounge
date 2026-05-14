@@ -591,6 +591,32 @@
 	padding: 0.2rem 0.5rem;
 }
 
+#chat .alienhand-workbench__stickies button {
+	background: transparent;
+	border: 0;
+	color: #5d4510;
+	font-size: 0.7rem;
+	font-weight: 900;
+	padding: 0;
+	text-decoration: underline;
+}
+
+#chat .alienhand-workbench__quote-form {
+	display: flex;
+	gap: 0.4rem;
+	margin-top: 0.45rem;
+}
+
+#chat .alienhand-workbench__quote-form input {
+	background: #fff;
+	border: 1px solid var(--alienhand-border);
+	border-radius: 6px;
+	color: var(--alienhand-text);
+	flex: 1 1 auto;
+	min-width: 0;
+	padding: 0.35rem 0.45rem;
+}
+
 #chat .alienhand-workbench__toc {
 	display: flex;
 	flex-wrap: wrap;
