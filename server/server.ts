@@ -367,11 +367,18 @@ function allRequests(_req: Request, res: Response, next: NextFunction) {
 }
 
 function addSecurityHeaders(_req: Request, res: Response, next: NextFunction) {
+	const connectSources = ["'self'", "ws:", "wss:"];
+	const alienHandResolverConnectSource = getAlienHandPayloadResolverConnectSource();
+
+	if (alienHandResolverConnectSource) {
+		connectSources.push(alienHandResolverConnectSource);
+	}
+
 	const policies = [
 		"default-src 'none'", // default to nothing
 		"base-uri 'none'", // disallow <base>, has no fallback to default-src
 		"form-action 'self'", // 'self' to fix saving passwords in Firefox, even though login is handled in javascript
-		"connect-src 'self' ws: wss:", // allow self for polling; websockets
+		`connect-src ${connectSources.join(" ")}`, // allow self for polling; websockets; AlienHand payload resolver
 		"style-src 'self' https: 'unsafe-inline'", // allow inline due to use in irc hex colors
 		"script-src 'self'", // javascript
 		"worker-src 'self'", // service worker
@@ -394,6 +401,26 @@ function addSecurityHeaders(_req: Request, res: Response, next: NextFunction) {
 	res.setHeader("Referrer-Policy", "no-referrer");
 
 	return next();
+}
+
+function getAlienHandPayloadResolverConnectSource() {
+	const resolverBaseUrl = Config.values.alienhand.payloadResolverBaseUrl;
+
+	if (!resolverBaseUrl) {
+		return "";
+	}
+
+	try {
+		const parsed = new URL(resolverBaseUrl);
+
+		if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+			return "";
+		}
+
+		return parsed.origin;
+	} catch (_error) {
+		return "";
+	}
 }
 
 function forceNoCacheRequest(_req: Request, res: Response, next: NextFunction) {
