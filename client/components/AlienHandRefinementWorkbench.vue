@@ -110,9 +110,16 @@
 						</li>
 					</ul>
 					<p v-else>No chapters yet.</p>
+					<form class="alienhand-workbench__chapter-form" @submit.prevent="createChapter">
+						<input v-model="chapterTitle" placeholder="Chapter title" />
+						<textarea v-model="chapterSummary" placeholder="Chapter summary" rows="3" />
+						<button class="btn" :disabled="!activeCuts.length || loading">
+							Create chapter
+						</button>
+					</form>
 				</div>
 				<form class="alienhand-workbench__search" @submit.prevent="runSearch">
-					<input v-model="searchTerm" placeholder="Search stored blocks" />
+					<input v-model="searchTerm" placeholder="Search raw chat blocks" />
 					<button class="btn btn-sm" :disabled="loading || !searchTerm.trim()">
 						Search
 					</button>
@@ -388,13 +395,6 @@
 							Insert here
 						</div>
 					</template>
-					<form class="alienhand-workbench__chapter-form" @submit.prevent="createChapter">
-						<input v-model="chapterTitle" placeholder="Chapter title" />
-						<textarea v-model="chapterSummary" placeholder="Chapter summary" rows="3" />
-						<button class="btn" :disabled="!activeCuts.length || loading">
-							Create chapter
-						</button>
-					</form>
 					<details v-if="removedCuts.length" class="alienhand-workbench__removed-cuts">
 						<summary>{{ removedCuts.length }} removed cuts</summary>
 						<button
@@ -425,18 +425,18 @@
 			>
 				<header class="alienhand-workbench__frame-header">
 					<strong>Editing</strong>
-					<span>{{ chapters.length }} chapters / {{ edits.length }} edits</span>
+					<span>{{ editingFrameStatus }}</span>
 				</header>
 				<div class="alienhand-workbench__frame-body">
-					<p v-if="!editingProjectionCuts.length" class="alienhand-workbench__empty">
-						Editing text appears after cuts are created.
+					<p v-if="!selectedChapter" class="alienhand-workbench__empty">
+						Create/select a chapter in the Chapters tab to focus Editing.
 					</p>
 					<div
-						v-if="editingProjectionCuts.length"
+						v-if="selectedChapter && editingFocusedCuts.length"
 						class="alienhand-workbench__editing-projection"
 					>
 						<button
-							v-for="cut in editingProjectionCuts"
+							v-for="cut in editingFocusedCuts"
 							:key="`editing:${cut.cut_id}`"
 							type="button"
 							:class="[
@@ -463,56 +463,64 @@
 							</span>
 						</button>
 					</div>
-					<p v-if="!chapters.length" class="alienhand-workbench__empty">
-						Chapters created from cuts will appear here.
+					<p
+						v-if="selectedChapter && !editingFocusedCuts.length"
+						class="alienhand-workbench__empty"
+					>
+						This chapter has no visible source cuts yet.
 					</p>
 					<article
-						v-for="chapter in chapters"
-						:id="sourceElementId('chapter', chapter.chapter_id)"
-						:key="chapter.chapter_id"
+						v-if="selectedChapter"
+						:id="sourceElementId('chapter', selectedChapter.chapter_id)"
 						:class="[
 							'alienhand-workbench__card',
 							{
 								'alienhand-workbench__card--source-highlight':
-									selectedChapterId === chapter.chapter_id,
+									selectedChapterId === selectedChapter.chapter_id,
 							},
 							{
 								'alienhand-workbench__card--bookmarked': targetBookmarks(
 									'chapter',
-									chapter.chapter_id
+									selectedChapter.chapter_id
 								).length,
 							},
 							{
 								'alienhand-workbench__card--sticky': targetStickies(
 									'chapter',
-									chapter.chapter_id
+									selectedChapter.chapter_id
 								).length,
 							},
 						]"
 					>
 						<div class="alienhand-workbench__meta">
-							<span>{{ chapter.member_cut_ids.length }} cuts</span>
-							<time>{{ formatTimestamp(chapter.updated_at) }}</time>
+							<span>{{ selectedChapter.member_cut_ids.length }} cuts</span>
+							<time>{{ formatTimestamp(selectedChapter.updated_at) }}</time>
 						</div>
-						<h4>{{ chapter.title }}</h4>
-						<p>{{ chapter.summary || "No summary yet." }}</p>
+						<h4>{{ selectedChapter.title }}</h4>
+						<p>{{ selectedChapter.summary || "No summary yet." }}</p>
 						<div
-							v-if="tocEntriesForTarget('chapter', chapter.chapter_id).length"
+							v-if="tocEntriesForTarget('chapter', selectedChapter.chapter_id).length"
 							class="alienhand-workbench__toc"
 						>
 							<span
-								v-for="entry in tocEntriesForTarget('chapter', chapter.chapter_id)"
+								v-for="entry in tocEntriesForTarget(
+									'chapter',
+									selectedChapter.chapter_id
+								)"
 								:key="`${entry.toc_id}:${entry.ordinal}`"
 							>
 								TOC {{ entry.ordinal + 1 }}: {{ entry.title }}
 							</span>
 						</div>
 						<div
-							v-if="targetBookmarks('chapter', chapter.chapter_id).length"
+							v-if="targetBookmarks('chapter', selectedChapter.chapter_id).length"
 							class="alienhand-workbench__bookmarks"
 						>
 							<div
-								v-for="bookmark in targetBookmarks('chapter', chapter.chapter_id)"
+								v-for="bookmark in targetBookmarks(
+									'chapter',
+									selectedChapter.chapter_id
+								)"
 								:key="bookmark.bookmark_id"
 								class="alienhand-workbench__bookmark-chip"
 							>
@@ -527,11 +535,11 @@
 							</div>
 						</div>
 						<div
-							v-if="targetQuotes('chapter', chapter.chapter_id).length"
+							v-if="targetQuotes('chapter', selectedChapter.chapter_id).length"
 							class="alienhand-workbench__quotes"
 						>
 							<blockquote
-								v-for="quote in targetQuotes('chapter', chapter.chapter_id)"
+								v-for="quote in targetQuotes('chapter', selectedChapter.chapter_id)"
 								:key="quote.quote_id"
 							>
 								{{ quote.excerpt }}
@@ -542,11 +550,14 @@
 							</blockquote>
 						</div>
 						<div
-							v-if="targetStickies('chapter', chapter.chapter_id).length"
+							v-if="targetStickies('chapter', selectedChapter.chapter_id).length"
 							class="alienhand-workbench__stickies"
 						>
 							<span
-								v-for="sticky in targetStickies('chapter', chapter.chapter_id)"
+								v-for="sticky in targetStickies(
+									'chapter',
+									selectedChapter.chapter_id
+								)"
 								:key="sticky.sticky_id"
 							>
 								Pinned reminder
@@ -559,8 +570,14 @@
 								</button>
 							</span>
 						</div>
-						<div v-if="chapterEdits(chapter).length" class="alienhand-workbench__edits">
-							<section v-for="edit in chapterEdits(chapter)" :key="edit.edit_id">
+						<div
+							v-if="chapterEdits(selectedChapter).length"
+							class="alienhand-workbench__edits"
+						>
+							<section
+								v-for="edit in chapterEdits(selectedChapter)"
+								:key="edit.edit_id"
+							>
 								<div>
 									<strong>{{ edit.edit_type }}</strong>
 									<span>{{ edit.author }}</span>
@@ -576,60 +593,71 @@
 						<div class="alienhand-workbench__actions">
 							<button
 								class="btn btn-sm"
-								:disabled="!canCreateSticky('chapter', chapter.chapter_id)"
-								@click="createSticky('chapter', chapter.chapter_id)"
+								:disabled="!canCreateSticky('chapter', selectedChapter.chapter_id)"
+								@click="createSticky('chapter', selectedChapter.chapter_id)"
 							>
 								Pin
 							</button>
 							<button
-								v-if="targetStickies('chapter', chapter.chapter_id).length"
+								v-if="targetStickies('chapter', selectedChapter.chapter_id).length"
 								class="btn btn-sm"
-								@click="removeFirstSticky('chapter', chapter.chapter_id)"
+								@click="removeFirstSticky('chapter', selectedChapter.chapter_id)"
 							>
 								Unpin
 							</button>
 							<button
 								class="btn btn-sm"
-								:disabled="!canCreateTocEntry(chapter)"
-								@click="createTocEntry(chapter)"
+								:disabled="!canCreateTocEntry(selectedChapter)"
+								@click="createTocEntry(selectedChapter)"
 							>
 								Add TOC
 							</button>
 						</div>
 						<form
 							class="alienhand-workbench__edit-form"
-							@submit.prevent="createChapterEdit(chapter)"
+							@submit.prevent="createChapterEdit(selectedChapter)"
 						>
 							<textarea
-								v-model="editDrafts[editDraftKey(chapter.chapter_id)]"
+								v-model="editDrafts[editDraftKey(selectedChapter.chapter_id)]"
 								placeholder="Editorial edit note"
 								rows="3"
 							/>
-							<button class="btn btn-sm" :disabled="!canCreateChapterEdit(chapter)">
+							<button
+								class="btn btn-sm"
+								:disabled="!canCreateChapterEdit(selectedChapter)"
+							>
 								Apply edit
 							</button>
 						</form>
 						<form
 							class="alienhand-workbench__bookmark-form"
-							@submit.prevent="createBookmark('chapter', chapter.chapter_id)"
+							@submit.prevent="createBookmark('chapter', selectedChapter.chapter_id)"
 						>
 							<input
-								v-model="bookmarkDrafts[bookmarkKey('chapter', chapter.chapter_id)]"
+								v-model="
+									bookmarkDrafts[
+										bookmarkKey('chapter', selectedChapter.chapter_id)
+									]
+								"
 								placeholder="Bookmark note"
 							/>
 							<button
 								class="btn btn-sm"
-								:disabled="!canCreateBookmark('chapter', chapter.chapter_id)"
+								:disabled="
+									!canCreateBookmark('chapter', selectedChapter.chapter_id)
+								"
 							>
 								Bookmark
 							</button>
 						</form>
 						<form
 							class="alienhand-workbench__quote-form"
-							@submit.prevent="createQuote('chapter', chapter.chapter_id)"
+							@submit.prevent="createQuote('chapter', selectedChapter.chapter_id)"
 						>
 							<input
-								v-model="quoteDrafts[quoteKey('chapter', chapter.chapter_id)]"
+								v-model="
+									quoteDrafts[quoteKey('chapter', selectedChapter.chapter_id)]
+								"
 								placeholder="Quote excerpt"
 							/>
 							<button
@@ -638,8 +666,8 @@
 								@click="
 									fillQuoteDraft(
 										'chapter',
-										chapter.chapter_id,
-										chapter.summary || chapter.title
+										selectedChapter.chapter_id,
+										selectedChapter.summary || selectedChapter.title
 									)
 								"
 							>
@@ -647,7 +675,7 @@
 							</button>
 							<button
 								class="btn btn-sm"
-								:disabled="!canCreateQuote('chapter', chapter.chapter_id)"
+								:disabled="!canCreateQuote('chapter', selectedChapter.chapter_id)"
 							>
 								Quote
 							</button>
@@ -789,7 +817,6 @@ export default defineComponent({
 
 		const channelUuid = computed(() => alienHandChannelUuidFromName(props.channel.name));
 		const activeCuts = computed(() => cuts.value.filter((cut) => cut.status === "active"));
-		const editingProjectionCuts = computed(() => [...activeCuts.value, ...removedCuts.value]);
 		const insertionPosition = computed(() =>
 			Math.min(Math.max(insertionIndex.value, 0), activeCuts.value.length)
 		);
@@ -828,6 +855,29 @@ export default defineComponent({
 			() => new Map(blocks.value.map((block) => [block.block_id, block]))
 		);
 		const cutById = computed(() => new Map(cuts.value.map((cut) => [cut.cut_id, cut])));
+		const selectedChapter = computed(() =>
+			chapters.value.find((chapter) => chapter.chapter_id === selectedChapterId.value)
+		);
+		const editingFocusedCuts = computed(() => {
+			if (!selectedChapter.value) {
+				return [];
+			}
+
+			return selectedChapter.value.member_cut_ids
+				.map((cutId) => cutById.value.get(cutId))
+				.filter((cut): cut is AlienHandConversationCut => Boolean(cut));
+		});
+		const editingFrameStatus = computed(() => {
+			if (!selectedChapter.value) {
+				return "create/select a chapter";
+			}
+
+			const chapterEditIds = new Set(selectedChapter.value.edit_chain || []);
+			const chapterEditCount = edits.value.filter((edit) =>
+				chapterEditIds.has(edit.edit_id)
+			).length;
+			return `${selectedChapter.value.member_cut_ids.length} cuts / ${chapterEditCount} edits`;
+		});
 		const workbenchStatusItems = computed(() => {
 			const items: Array<{kind: string; text: string}> = [];
 
@@ -843,22 +893,24 @@ export default defineComponent({
 			} else if (selectedSourceBlock.value) {
 				items.push({
 					kind: "ready",
-					text: `Ready to cut @${selectedSourceBlock.value.sender} at ${insertionLabel.value}.`,
+					text: `Selected @${selectedSourceBlock.value.sender} for insertion at ${insertionLabel.value}.`,
 				});
 			}
 
-			items.push({
-				kind: directives.value.length ? "ready" : "blocked",
-				text: directives.value.length
-					? `${directives.value.length} directive ledger events, latest #${latestDirectiveSequence.value}.`
-					: "No directive ledger events for this channel.",
-			});
+			if (directives.value.length || showRawText.value) {
+				items.push({
+					kind: directives.value.length ? "ready" : "blocked",
+					text: directives.value.length
+						? `${directives.value.length} directive ledger events, latest #${latestDirectiveSequence.value}.`
+						: "No directive ledger events for this channel.",
+				});
+			}
 
 			if (sourceRevealStatus.value) {
 				items.push({kind: "info", text: sourceRevealStatus.value});
 			}
 
-			if (directiveSyncStatus.value) {
+			if (directiveSyncStatus.value && showRawText.value) {
 				items.push({kind: "info", text: directiveSyncStatus.value});
 			}
 
@@ -1351,7 +1403,12 @@ export default defineComponent({
 			error.value = "";
 
 			try {
-				await createAlienHandRefinementChapter(title, summary, cutIds);
+				const chapter = await createAlienHandRefinementChapter(title, summary, cutIds);
+				selectedChapterId.value = chapter.chapter_id;
+				directoryTab.value = "chapters";
+				sourceRevealStatus.value = `Created and selected chapter ${
+					chapter.title || chapter.chapter_id
+				}.`;
 				chapterTitle.value = "";
 				chapterSummary.value = "";
 				await refresh();
@@ -1895,7 +1952,8 @@ export default defineComponent({
 			editDraftKey,
 			editDrafts,
 			editingCutLabel,
-			editingProjectionCuts,
+			editingFocusedCuts,
+			editingFrameStatus,
 			edits,
 			error,
 			fillQuoteDraft,
@@ -1936,6 +1994,7 @@ export default defineComponent({
 			searchHitBlockIds,
 			searchTerm,
 			selectChapter,
+			selectedChapter,
 			selectedSourceBlock,
 			selectedChapterId,
 			hasCutSource,
