@@ -344,6 +344,31 @@
 	min-width: 1.2rem;
 }
 
+#chat .alienhand-workbench__stream-inspector {
+	background: #f8faf9;
+	border: 1px solid var(--alienhand-border);
+	border-radius: 8px;
+	display: grid;
+	gap: 0.35rem;
+	margin-top: 0.5rem;
+	padding: 0.55rem;
+}
+
+#chat .alienhand-workbench__stream-inspector div {
+	align-items: center;
+	display: flex;
+	gap: 0.45rem;
+	justify-content: space-between;
+}
+
+#chat .alienhand-workbench__stream-inspector p,
+#chat .alienhand-workbench__stream-inspector code {
+	color: var(--alienhand-muted);
+	font-size: 0.72rem;
+	margin: 0;
+	overflow-wrap: anywhere;
+}
+
 #chat .alienhand-workbench__source-bubble {
 	align-items: center;
 	background: #fffdf8;

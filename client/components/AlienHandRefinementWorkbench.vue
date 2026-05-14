@@ -70,6 +70,14 @@
 					>
 						Chapters
 					</button>
+					<button
+						type="button"
+						role="tab"
+						:aria-selected="directoryTab === 'workers'"
+						@click="directoryTab = 'workers'"
+					>
+						Workers
+					</button>
 				</div>
 				<div v-if="directoryTab === 'nicks'" class="alienhand-workbench__directory-panel">
 					<span
@@ -84,7 +92,10 @@
 						</li>
 					</ul>
 				</div>
-				<div v-else class="alienhand-workbench__directory-panel">
+				<div
+					v-else-if="directoryTab === 'chapters'"
+					class="alienhand-workbench__directory-panel"
+				>
 					<span>{{ chapters.length }} chapter{{ chapters.length === 1 ? "" : "s" }}</span>
 					<ul v-if="chapters.length">
 						<li v-for="chapter in chapters" :key="chapter.chapter_id">
@@ -117,6 +128,44 @@
 							Create chapter
 						</button>
 					</form>
+				</div>
+				<div v-else class="alienhand-workbench__directory-panel">
+					<span>{{ streamRequests.length }} worker request{{ streamRequests.length === 1 ? "" : "s" }}</span>
+					<ul v-if="streamRequests.length">
+						<li v-for="snapshot in streamRequests" :key="snapshot.request.request_id">
+							<button
+								type="button"
+								:class="[
+									'alienhand-workbench__directory-item',
+									{
+										'alienhand-workbench__directory-item--selected':
+											selectedStreamRequestId === snapshot.request.request_id,
+									},
+								]"
+								:aria-current="
+									selectedStreamRequestId === snapshot.request.request_id
+										? 'location'
+										: undefined
+								"
+								@click="selectStreamRequest(snapshot)"
+							>
+								<strong>{{ snapshot.request.status }}</strong>
+								<span>{{ snapshot.request.task_type }}</span>
+							</button>
+						</li>
+					</ul>
+					<p v-else>No worker requests yet.</p>
+					<article
+						v-if="selectedStreamRequest"
+						class="alienhand-workbench__stream-inspector"
+					>
+						<div>
+							<strong>{{ selectedStreamRequest.request.task_type }}</strong>
+							<span>{{ selectedStreamRequest.request.status }}</span>
+						</div>
+						<p>{{ latestStreamResponseSummary(selectedStreamRequest) }}</p>
+						<code>{{ shortSourceId(selectedStreamRequest.request.request_id) }}</code>
+					</article>
 				</div>
 				<form class="alienhand-workbench__search" @submit.prevent="runSearch">
 					<input v-model="searchTerm" placeholder="Search raw chat blocks" />
@@ -734,6 +783,7 @@ import {
 	listAlienHandRefinementQuotes,
 	listAlienHandRefinementStickies,
 	listAlienHandRefinementToc,
+	listAlienHandStreamRequests,
 	removeAlienHandRefinementCut,
 	removeAlienHandRefinementSticky,
 	searchAlienHandRefinement,
@@ -750,6 +800,7 @@ import {
 	type AlienHandConversationTocEntry,
 	type AlienHandHistoryReplayChunk,
 	type AlienHandRefinementTargetType,
+	type AlienHandStreamRequestSnapshot,
 	type AlienHandStickyTargetType,
 } from "../js/helpers/alienhand";
 
@@ -770,6 +821,8 @@ export default defineComponent({
 		const editDiffs = ref<AlienHandConversationEditDiff[]>([]);
 		const tocEntries = ref<AlienHandConversationTocEntry[]>([]);
 		const directives = ref<AlienHandConversationDirective[]>([]);
+		const streamRequests = ref<AlienHandStreamRequestSnapshot[]>([]);
+		const streamSummary = ref<Record<string, number>>({});
 		const selectedSourceBlock = ref<AlienHandConversationBlockInput | null>(null);
 		const historyChunks = ref<AlienHandHistoryReplayChunk[]>([]);
 		const bookmarkDrafts = ref<Record<string, string>>({});
@@ -799,7 +852,8 @@ export default defineComponent({
 		const highlightedCutId = ref("");
 		const highlightedEditCutId = ref("");
 		const selectedChapterId = ref("");
-		const directoryTab = ref<"nicks" | "chapters">("nicks");
+		const selectedStreamRequestId = ref("");
+		const directoryTab = ref<"nicks" | "chapters" | "workers">("nicks");
 		const cutScroller = ref<HTMLElement | null>(null);
 		const bridgeRail = ref<HTMLElement | null>(null);
 		const rawTextOutput = ref<HTMLElement | null>(null);
@@ -858,6 +912,25 @@ export default defineComponent({
 		const selectedChapter = computed(() =>
 			chapters.value.find((chapter) => chapter.chapter_id === selectedChapterId.value)
 		);
+		const selectedStreamRequest = computed(() =>
+			streamRequests.value.find(
+				(snapshot) => snapshot.request.request_id === selectedStreamRequestId.value
+			)
+		);
+		const activeStreamRequestCount = computed(() =>
+			streamRequests.value.filter((snapshot) =>
+				["ready", "claimed"].includes(snapshot.request.status)
+			).length
+		);
+		const streamStatusSummaryText = computed(() => {
+			const entries = Object.entries(streamSummary.value)
+				.filter(([, count]) => count > 0)
+				.sort(([left], [right]) => left.localeCompare(right));
+
+			return entries.length
+				? entries.map(([status, count]) => `${status} ${count}`).join(", ")
+				: "none";
+		});
 		const editingFocusedCuts = computed(() => {
 			if (!selectedChapter.value) {
 				return [];
@@ -903,6 +976,13 @@ export default defineComponent({
 					text: directives.value.length
 						? `${directives.value.length} directive ledger events, latest #${latestDirectiveSequence.value}.`
 						: "No directive ledger events for this channel.",
+				});
+			}
+
+			if (streamRequests.value.length || showRawText.value) {
+				items.push({
+					kind: activeStreamRequestCount.value ? "busy" : "info",
+					text: `${streamRequests.value.length} worker requests (${streamStatusSummaryText.value}).`,
 				});
 			}
 
@@ -1010,6 +1090,8 @@ export default defineComponent({
 					quotes: quotes.value,
 					removedCuts: removedCuts.value,
 					stickies: stickies.value,
+					streamRequests: streamRequests.value,
+					streamSummary: streamSummary.value,
 					tocEntries: tocEntries.value,
 				},
 				null,
@@ -1058,6 +1140,7 @@ export default defineComponent({
 					nextEditDiffs,
 					nextTocEntries,
 					nextDirectives,
+					nextStreamRequestList,
 				] = await Promise.all([
 					listAlienHandRefinementBlocks(channelUuid.value),
 					listAlienHandRefinementCuts(channelUuid.value),
@@ -1070,6 +1153,7 @@ export default defineComponent({
 					listAlienHandRefinementEditDiffs(),
 					listAlienHandRefinementToc("main"),
 					listAlienHandRefinementDirectives(channelUuid.value),
+					listAlienHandStreamRequests(channelUuid.value),
 				]);
 
 				blocks.value = nextBlocks;
@@ -1083,6 +1167,17 @@ export default defineComponent({
 				editDiffs.value = nextEditDiffs;
 				tocEntries.value = nextTocEntries;
 				directives.value = nextDirectives;
+				streamRequests.value = nextStreamRequestList.requests;
+				streamSummary.value = nextStreamRequestList.summary;
+				if (
+					selectedStreamRequestId.value &&
+					!streamRequests.value.some(
+						(snapshot) =>
+							snapshot.request.request_id === selectedStreamRequestId.value
+					)
+				) {
+					selectedStreamRequestId.value = "";
+				}
 				sourceRevealStatus.value = "Refinement state refreshed.";
 			} catch (caught) {
 				error.value = caught instanceof Error ? caught.message : String(caught);
@@ -1152,6 +1247,9 @@ export default defineComponent({
 				const response = await createAlienHandHistoryRequest(channelUuid.value);
 				historyChunks.value = response.chunks;
 				historyStatus.value = `Loaded history: ${response.resolved_payloads} payloads across ${response.chunk_count} chunks.`;
+				if (response.stream_request_id) {
+					selectedStreamRequestId.value = response.stream_request_id;
+				}
 				await refresh();
 			} catch (caught) {
 				error.value = caught instanceof Error ? caught.message : String(caught);
@@ -1538,6 +1636,28 @@ export default defineComponent({
 		const shortSourceId = (sourceId: string) =>
 			sourceId.length > 12 ? `${sourceId.slice(0, 8)}...` : sourceId;
 
+		const selectStreamRequest = (snapshot: AlienHandStreamRequestSnapshot) => {
+			selectedStreamRequestId.value = snapshot.request.request_id;
+		};
+
+		const latestStreamResponseSummary = (snapshot: AlienHandStreamRequestSnapshot) => {
+			const response = snapshot.responses[0];
+
+			if (response?.result_summary) {
+				return response.result_summary;
+			}
+
+			if (response?.error_ref) {
+				return response.error_ref;
+			}
+
+			if (snapshot.request.error_ref) {
+				return snapshot.request.error_ref;
+			}
+
+			return `${snapshot.request.requester_kind}:${snapshot.request.requester_id}`;
+		};
+
 		const createQuote = async (sourceType: AlienHandRefinementTargetType, sourceId: string) => {
 			const key = quoteKey(sourceType, sourceId);
 			const excerpt = quoteDrafts.value[key]?.trim() || "";
@@ -1862,6 +1982,8 @@ export default defineComponent({
 				editDiffs.value = [];
 				tocEntries.value = [];
 				removedCuts.value = [];
+				streamRequests.value = [];
+				streamSummary.value = {};
 				historyChunks.value = [];
 				selectedSourceBlock.value = null;
 				bookmarkDrafts.value = {};
@@ -1873,6 +1995,7 @@ export default defineComponent({
 				highlightedCutId.value = "";
 				highlightedEditCutId.value = "";
 				selectedChapterId.value = "";
+				selectedStreamRequestId.value = "";
 				sourceRevealStatus.value = "";
 				historyStatus.value = "";
 				keyboardShortcutStatus.value = "";
@@ -1994,9 +2117,12 @@ export default defineComponent({
 			searchHitBlockIds,
 			searchTerm,
 			selectChapter,
+			selectStreamRequest,
 			selectedChapter,
+			selectedStreamRequest,
 			selectedSourceBlock,
 			selectedChapterId,
+			selectedStreamRequestId,
 			hasCutSource,
 			showCutsPane,
 			showEditsPane,
@@ -2006,8 +2132,12 @@ export default defineComponent({
 			sourceRevealStatus,
 			startBridgeDrag,
 			shortSourceId,
+			latestStreamResponseSummary,
 			syncBridgeToInsertionMarker,
 			stickies,
+			streamRequests,
+			streamStatusSummaryText,
+			streamSummary,
 			targetBookmarks,
 			targetQuotes,
 			targetStickies,

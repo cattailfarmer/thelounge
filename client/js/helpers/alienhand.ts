@@ -124,6 +124,80 @@ export type AlienHandConversationDirective = {
 	created_at: string;
 };
 
+export type AlienHandStreamRequest = {
+	request_id: string;
+	app_id: number;
+	channel_uuid?: string | null;
+	requester_kind: string;
+	requester_id: string;
+	task_type: string;
+	input_ref: string;
+	evidence_refs: Record<string, unknown>[];
+	model_budget_hint: string;
+	priority: string;
+	deadline_ms?: number | null;
+	idempotency_key?: string | null;
+	status: string;
+	attempt_count: number;
+	lease_id?: string | null;
+	error_ref?: string | null;
+	created_at: string;
+	updated_at: string;
+	completed_at?: string | null;
+};
+
+export type AlienHandStreamAttempt = {
+	attempt_id: string;
+	attempt_number: number;
+	worker_id?: string | null;
+	status: string;
+	lease_id?: string | null;
+	started_at: string;
+	completed_at?: string | null;
+	heartbeat_at?: string | null;
+	error_ref?: string | null;
+	created_at: string;
+};
+
+export type AlienHandStreamLease = {
+	lease_id: string;
+	attempt_id: string;
+	worker_id: string;
+	status: string;
+	acquired_at: string;
+	expires_at: string;
+	heartbeat_at?: string | null;
+	released_at?: string | null;
+	created_at: string;
+};
+
+export type AlienHandStreamResponse = {
+	response_id: string;
+	status: string;
+	result_summary?: string | null;
+	result_ref?: string | null;
+	model_route: Record<string, unknown>;
+	justification_ref?: string | null;
+	artifact_refs: string[];
+	error_ref?: string | null;
+	created_at: string;
+	completed_at?: string | null;
+};
+
+export type AlienHandStreamRequestSnapshot = {
+	request: AlienHandStreamRequest;
+	attempts: AlienHandStreamAttempt[];
+	lease?: AlienHandStreamLease | null;
+	responses: AlienHandStreamResponse[];
+};
+
+export type AlienHandStreamRequestList = {
+	requests: AlienHandStreamRequestSnapshot[];
+	summary: Record<string, number>;
+	count: number;
+	limit: number;
+};
+
 export type AlienHandHistoryReplayChunk = {
 	channel_uuid: string;
 	chunk_index: number;
@@ -140,6 +214,8 @@ export type AlienHandHistoryReplayChunk = {
 export type AlienHandHistoryRequestResponse = {
 	request: Record<string, unknown>;
 	directive: AlienHandConversationDirective;
+	stream_request_id?: string | null;
+	stream_request?: AlienHandStreamRequest | null;
 	chunks: AlienHandHistoryReplayChunk[];
 	chunk_count: number;
 	chunk_lengths: number[];
@@ -437,6 +513,24 @@ export async function listAlienHandRefinementDirectives(
 	}>(`/directives?channel=${encodeURIComponent(channelUuid)}${afterQuery}${limitQuery}`);
 
 	return response.directives || [];
+}
+
+export async function listAlienHandStreamRequests(
+	channelUuid: string,
+	limit = 25
+): Promise<AlienHandStreamRequestList> {
+	const response = await fetchAlienHandRefinement<Partial<AlienHandStreamRequestList>>(
+		`/stream-requests?channel=${encodeURIComponent(channelUuid)}&limit=${encodeURIComponent(
+			limit
+		)}`
+	);
+
+	return {
+		requests: response.requests || [],
+		summary: response.summary || {},
+		count: response.count || 0,
+		limit: response.limit || limit,
+	};
 }
 
 export async function searchAlienHandRefinement(
