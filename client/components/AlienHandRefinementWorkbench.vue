@@ -33,6 +33,9 @@
 			</div>
 			<div class="alienhand-workbench__runtime">
 				<span>{{ channelUuid }}</span>
+				<button class="btn btn-sm" :disabled="loadingHistory" @click="loadHistory">
+					Load history
+				</button>
 				<button class="btn btn-sm" :disabled="loading" @click="refresh">Refresh</button>
 			</div>
 		</header>
@@ -634,6 +637,7 @@ import {
 	createAlienHandRefinementQuote,
 	createAlienHandRefinementSticky,
 	createAlienHandRefinementTocEntry,
+	createAlienHandHistoryRequest,
 	listAlienHandRefinementBlocks,
 	listAlienHandRefinementBookmarks,
 	listAlienHandRefinementChapters,
@@ -658,6 +662,7 @@ import {
 	type AlienHandConversationQuote,
 	type AlienHandConversationSticky,
 	type AlienHandConversationTocEntry,
+	type AlienHandHistoryReplayChunk,
 	type AlienHandRefinementTargetType,
 	type AlienHandStickyTargetType,
 } from "../js/helpers/alienhand";
@@ -680,10 +685,12 @@ export default defineComponent({
 		const tocEntries = ref<AlienHandConversationTocEntry[]>([]);
 		const directives = ref<AlienHandConversationDirective[]>([]);
 		const selectedSourceBlock = ref<AlienHandConversationBlockInput | null>(null);
+		const historyChunks = ref<AlienHandHistoryReplayChunk[]>([]);
 		const bookmarkDrafts = ref<Record<string, string>>({});
 		const quoteDrafts = ref<Record<string, string>>({});
 		const editDrafts = ref<Record<string, string>>({});
 		const loading = ref(false);
+		const loadingHistory = ref(false);
 		const error = ref("");
 		const pendingBlockId = ref("");
 		const pendingCutId = ref("");
@@ -715,6 +722,7 @@ export default defineComponent({
 		const bridgeDragStartTop = ref(520);
 		const sourceRevealStatus = ref("");
 		const directiveSyncStatus = ref("");
+		const historyStatus = ref("");
 		let directivePollTimer: ReturnType<typeof window.setInterval> | null = null;
 
 		const channelUuid = computed(() => alienHandChannelUuidFromName(props.channel.name));
@@ -789,6 +797,10 @@ export default defineComponent({
 
 			if (directiveSyncStatus.value) {
 				items.push({kind: "info", text: directiveSyncStatus.value});
+			}
+
+			if (historyStatus.value) {
+				items.push({kind: "info", text: historyStatus.value});
 			}
 
 			if (error.value) {
@@ -871,6 +883,7 @@ export default defineComponent({
 					directives: directives.value,
 					editDiffs: editDiffs.value,
 					edits: edits.value,
+					historyChunks: historyChunks.value,
 					quotes: quotes.value,
 					removedCuts: removedCuts.value,
 					stickies: stickies.value,
@@ -980,6 +993,28 @@ export default defineComponent({
 				error.value = caught instanceof Error ? caught.message : String(caught);
 			} finally {
 				loading.value = false;
+			}
+		};
+
+		const loadHistory = async () => {
+			if (!channelUuid.value) {
+				return;
+			}
+
+			loadingHistory.value = true;
+			error.value = "";
+			historyStatus.value = "Loading channel history.";
+
+			try {
+				const response = await createAlienHandHistoryRequest(channelUuid.value);
+				historyChunks.value = response.chunks;
+				historyStatus.value = `Loaded history: ${response.resolved_payloads} payloads across ${response.chunk_count} chunks.`;
+				await refresh();
+			} catch (caught) {
+				error.value = caught instanceof Error ? caught.message : String(caught);
+				historyStatus.value = "History request failed; see workbench error.";
+			} finally {
+				loadingHistory.value = false;
 			}
 		};
 
@@ -1589,6 +1624,7 @@ export default defineComponent({
 				editDiffs.value = [];
 				tocEntries.value = [];
 				removedCuts.value = [];
+				historyChunks.value = [];
 				selectedSourceBlock.value = null;
 				bookmarkDrafts.value = {};
 				quoteDrafts.value = {};
@@ -1600,6 +1636,7 @@ export default defineComponent({
 				highlightedEditCutId.value = "";
 				selectedChapterId.value = "";
 				sourceRevealStatus.value = "";
+				historyStatus.value = "";
 				await refresh();
 			},
 			{immediate: true}
@@ -1675,11 +1712,15 @@ export default defineComponent({
 			highlightedBlockId,
 			highlightedCutId,
 			highlightedEditCutId,
+			historyChunks,
+			historyStatus,
 			insertionIndex,
 			insertionLabel,
 			insertSelectedSource,
 			insertFromBridge,
 			loading,
+			loadingHistory,
+			loadHistory,
 			moveInsertion,
 			pendingBlockId,
 			pendingCutId,

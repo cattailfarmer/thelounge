@@ -124,6 +124,29 @@ export type AlienHandConversationDirective = {
 	created_at: string;
 };
 
+export type AlienHandHistoryReplayChunk = {
+	channel_uuid: string;
+	chunk_index: number;
+	direction: string;
+	event_count: number;
+	events: Array<{
+		envelope?: Record<string, unknown>;
+		payload?: Record<string, unknown>;
+		[key: string]: unknown;
+	}>;
+	has_more: boolean;
+};
+
+export type AlienHandHistoryRequestResponse = {
+	request: Record<string, unknown>;
+	directive: AlienHandConversationDirective;
+	chunks: AlienHandHistoryReplayChunk[];
+	chunk_count: number;
+	chunk_lengths: number[];
+	payload_errors: number;
+	resolved_payloads: number;
+};
+
 export type AlienHandRefinementSearchHit = {
 	term: string;
 	block_id: string;
@@ -426,6 +449,22 @@ export async function searchAlienHandRefinement(
 	);
 
 	return response.hits || [];
+}
+
+export async function createAlienHandHistoryRequest(
+	channelUuid: string,
+	messages = 50,
+	chunkSize = 10
+): Promise<AlienHandHistoryRequestResponse> {
+	return fetchAlienHandRefinement<AlienHandHistoryRequestResponse>("/history-requests", {
+		body: JSON.stringify({
+			channel_uuid: channelUuid,
+			chunk_size: chunkSize,
+			messages,
+			source: "thelounge-workbench",
+		}),
+		method: "POST",
+	});
 }
 
 export async function createAlienHandRefinementBlock(
