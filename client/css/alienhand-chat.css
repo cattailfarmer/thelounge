@@ -599,6 +599,12 @@
 	white-space: pre-wrap;
 }
 
+#chat .alienhand-workbench__quotes footer {
+	color: var(--alienhand-muted);
+	font-size: 0.68rem;
+	margin-top: 0.35rem;
+}
+
 #chat .alienhand-workbench__stickies {
 	display: flex;
 	flex-wrap: wrap;

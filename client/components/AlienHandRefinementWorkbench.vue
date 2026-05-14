@@ -295,6 +295,10 @@
 									:key="quote.quote_id"
 								>
 									{{ quote.excerpt }}
+									<footer>
+										Quote source: {{ quote.source_type }}
+										{{ shortSourceId(quote.source_id) }}
+									</footer>
 								</blockquote>
 							</div>
 							<div
@@ -354,6 +358,19 @@
 									v-model="quoteDrafts[quoteKey('cut', cut.cut_id)]"
 									placeholder="Quote excerpt"
 								/>
+								<button
+									class="btn btn-sm"
+									type="button"
+									@click="
+										fillQuoteDraft(
+											'cut',
+											cut.cut_id,
+											cutSourcePresentation(cut)
+										)
+									"
+								>
+									Use source as quote
+								</button>
 								<button
 									class="btn btn-sm"
 									:disabled="!canCreateQuote('cut', cut.cut_id)"
@@ -518,6 +535,10 @@
 								:key="quote.quote_id"
 							>
 								{{ quote.excerpt }}
+								<footer>
+									Quote source: {{ quote.source_type }}
+									{{ shortSourceId(quote.source_id) }}
+								</footer>
 							</blockquote>
 						</div>
 						<div
@@ -611,6 +632,19 @@
 								v-model="quoteDrafts[quoteKey('chapter', chapter.chapter_id)]"
 								placeholder="Quote excerpt"
 							/>
+							<button
+								class="btn btn-sm"
+								type="button"
+								@click="
+									fillQuoteDraft(
+										'chapter',
+										chapter.chapter_id,
+										chapter.summary || chapter.title
+									)
+								"
+							>
+								Use summary as quote
+							</button>
 							<button
 								class="btn btn-sm"
 								:disabled="!canCreateQuote('chapter', chapter.chapter_id)"
@@ -1435,6 +1469,18 @@ export default defineComponent({
 			}
 		};
 
+		const fillQuoteDraft = (
+			sourceType: AlienHandRefinementTargetType,
+			sourceId: string,
+			excerpt: string
+		) => {
+			quoteDrafts.value[quoteKey(sourceType, sourceId)] = excerpt;
+			sourceRevealStatus.value = `Quote draft filled from ${sourceType} source.`;
+		};
+
+		const shortSourceId = (sourceId: string) =>
+			sourceId.length > 12 ? `${sourceId.slice(0, 8)}...` : sourceId;
+
 		const createQuote = async (sourceType: AlienHandRefinementTargetType, sourceId: string) => {
 			const key = quoteKey(sourceType, sourceId);
 			const excerpt = quoteDrafts.value[key]?.trim() || "";
@@ -1852,6 +1898,7 @@ export default defineComponent({
 			editingProjectionCuts,
 			edits,
 			error,
+			fillQuoteDraft,
 			firstSticky,
 			formatJson,
 			formatTimestamp,
@@ -1899,6 +1946,7 @@ export default defineComponent({
 			sourceElementId,
 			sourceRevealStatus,
 			startBridgeDrag,
+			shortSourceId,
 			syncBridgeToInsertionMarker,
 			stickies,
 			targetBookmarks,
