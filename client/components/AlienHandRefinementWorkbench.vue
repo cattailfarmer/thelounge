@@ -8,13 +8,13 @@
 			<div class="alienhand-workbench__controls">
 				<button class="btn btn-sm" :disabled="loading" @click="refresh">Refresh</button>
 				<button class="btn btn-sm" :aria-pressed="showRawPane" @click="showRawPane = !showRawPane">
-					Raw
+					Chat
 				</button>
 				<button class="btn btn-sm" :aria-pressed="showCutsPane" @click="showCutsPane = !showCutsPane">
-					Cuts
+					Cutting
 				</button>
 				<button class="btn btn-sm" :aria-pressed="showEditsPane" @click="showEditsPane = !showEditsPane">
-					Edits
+					Editing
 				</button>
 			</div>
 		</header>
@@ -55,7 +55,7 @@
 		<div class="alienhand-workbench__panes">
 			<section v-if="showRawPane" class="alienhand-workbench__pane">
 				<header>
-					<h3>Raw conversation</h3>
+					<h3>Chat</h3>
 					<span>{{ blocks.length }} blocks</span>
 				</header>
 				<p v-if="!blocks.length" class="alienhand-workbench__empty">
@@ -190,7 +190,7 @@
 
 			<section v-if="showCutsPane" class="alienhand-workbench__pane">
 				<header>
-					<h3>Cuts</h3>
+					<h3>Cutting</h3>
 					<span>{{ activeCuts.length }} active</span>
 				</header>
 				<p class="alienhand-workbench__pointer">
@@ -331,7 +331,7 @@
 
 			<section v-if="showEditsPane" class="alienhand-workbench__pane">
 				<header>
-					<h3>Edits</h3>
+					<h3>Editing</h3>
 					<span>{{ chapters.length }} chapters / {{ edits.length }} edits</span>
 				</header>
 				<p v-if="!chapters.length" class="alienhand-workbench__empty">
