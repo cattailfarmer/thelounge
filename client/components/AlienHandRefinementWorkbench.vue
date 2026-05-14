@@ -411,12 +411,15 @@
 					<span>{{ chapters.length }} chapters / {{ edits.length }} edits</span>
 				</header>
 				<div class="alienhand-workbench__frame-body">
-					<p v-if="!activeCuts.length" class="alienhand-workbench__empty">
+					<p v-if="!editingProjectionCuts.length" class="alienhand-workbench__empty">
 						Editing text appears after cuts are created.
 					</p>
-					<div v-if="activeCuts.length" class="alienhand-workbench__editing-projection">
+					<div
+						v-if="editingProjectionCuts.length"
+						class="alienhand-workbench__editing-projection"
+					>
 						<button
-							v-for="cut in activeCuts"
+							v-for="cut in editingProjectionCuts"
 							:key="`editing:${cut.cut_id}`"
 							type="button"
 							:class="[
@@ -425,10 +428,17 @@
 									'alienhand-workbench__editing-line--source-highlight':
 										highlightedEditCutId === cut.cut_id,
 								},
+								{
+									'alienhand-workbench__editing-line--removed':
+										cut.status === 'removed',
+								},
 							]"
-							:aria-label="`Reveal source for ${cutSourcePresentation(cut)}`"
+							:aria-label="`Reveal source for ${editingCutLabel(
+								cut
+							)} ${cutSourcePresentation(cut)}`"
 							@click="revealCutSource(cut)"
 						>
+							<strong>{{ editingCutLabel(cut) }}</strong>
 							<span
 								:class="{'alienhand-workbench__stale-source': !hasCutSource(cut)}"
 							>
@@ -727,6 +737,7 @@ export default defineComponent({
 
 		const channelUuid = computed(() => alienHandChannelUuidFromName(props.channel.name));
 		const activeCuts = computed(() => cuts.value.filter((cut) => cut.status === "active"));
+		const editingProjectionCuts = computed(() => [...activeCuts.value, ...removedCuts.value]);
 		const insertionPosition = computed(() =>
 			Math.min(Math.max(insertionIndex.value, 0), activeCuts.value.length)
 		);
@@ -1221,6 +1232,9 @@ export default defineComponent({
 			blockById.value.get(cut.source_block_id)?.presentation ||
 			`Missing source block ${cut.source_block_id}`;
 
+		const editingCutLabel = (cut: AlienHandConversationCut) =>
+			cut.status === "removed" ? "Removed editing source line" : "Editing source line";
+
 		const targetQuotes = (sourceType: AlienHandRefinementTargetType, sourceId: string) =>
 			quotesBySource.value.get(quoteKey(sourceType, sourceId)) || [];
 
@@ -1500,6 +1514,10 @@ export default defineComponent({
 			highlightedCutId.value = cut.cut_id;
 			highlightedBlockId.value = cut.source_block_id;
 			highlightedEditCutId.value = cut.cut_id;
+			const hiddenFrames = [
+				showCutsPane.value ? "" : "Cutting",
+				showRawPane.value ? "" : "Chat",
+			].filter(Boolean);
 
 			if (cut.status !== "active") {
 				sourceRevealStatus.value = "Revealing source for a removed cut.";
@@ -1532,9 +1550,17 @@ export default defineComponent({
 			} else if (showRawPane.value) {
 				sourceRevealStatus.value =
 					"Cut source block is missing from the current stored block set.";
+			} else if (!hasCutSource(cut)) {
+				sourceRevealStatus.value =
+					"Chat is hidden, and the source block is missing from the current stored block set.";
 			} else {
 				sourceRevealStatus.value =
 					"Chat is hidden, so the source chat block cannot be shown.";
+			}
+
+			if (hiddenFrames.length === 2) {
+				sourceRevealStatus.value =
+					"Chat and Cutting are hidden, so the source locations are highlighted but not visible.";
 			}
 		};
 
@@ -1704,6 +1730,8 @@ export default defineComponent({
 			editDiffsForEdit,
 			editDraftKey,
 			editDrafts,
+			editingCutLabel,
+			editingProjectionCuts,
 			edits,
 			error,
 			firstSticky,

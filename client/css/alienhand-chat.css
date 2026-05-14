@@ -734,6 +734,19 @@
 	white-space: pre-wrap;
 }
 
+#chat .alienhand-workbench__editing-line strong {
+	color: var(--alienhand-link);
+	display: block;
+	font-size: 0.68rem;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+
+#chat .alienhand-workbench__editing-line--removed {
+	border-left: 3px solid #bd8f2a;
+	color: var(--alienhand-muted);
+}
+
 #chat .alienhand-workbench__editing-line:hover,
 #chat .alienhand-workbench__editing-line:focus,
 #chat .alienhand-workbench__editing-line--source-highlight {
