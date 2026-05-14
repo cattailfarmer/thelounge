@@ -63,10 +63,15 @@
 				</p>
 				<article
 					v-for="block in blocks"
+					:id="sourceElementId('block', block.block_id)"
 					:key="block.block_id"
 					:class="[
 						'alienhand-workbench__card',
 						{'alienhand-workbench__card--hit': searchHitBlockIds.has(block.block_id)},
+						{
+							'alienhand-workbench__card--source-highlight':
+								highlightedBlockId === block.block_id,
+						},
 						{
 							'alienhand-workbench__card--bookmarked':
 								targetBookmarks('block', block.block_id).length,
@@ -196,9 +201,14 @@
 				</p>
 				<article
 					v-for="cut in activeCuts"
+					:id="sourceElementId('cut', cut.cut_id)"
 					:key="cut.cut_id"
 					:class="[
 						'alienhand-workbench__card',
+						{
+							'alienhand-workbench__card--source-highlight':
+								highlightedCutId === cut.cut_id,
+						},
 						{
 							'alienhand-workbench__card--bookmarked':
 								targetBookmarks('cut', cut.cut_id).length,
@@ -327,6 +337,27 @@
 				<p v-if="!chapters.length" class="alienhand-workbench__empty">
 					Chapters created from cuts will appear here.
 				</p>
+				<div v-if="activeCuts.length" class="alienhand-workbench__editing-projection">
+					<header>
+						<strong>Editing text</strong>
+						<span>Click a line to reveal its source cut and chat block.</span>
+					</header>
+					<button
+						v-for="cut in activeCuts"
+						:key="`editing:${cut.cut_id}`"
+						type="button"
+						:class="[
+							'alienhand-workbench__editing-line',
+							{
+								'alienhand-workbench__editing-line--source-highlight':
+									highlightedEditCutId === cut.cut_id,
+							},
+						]"
+						@click="revealCutSource(cut)"
+					>
+						{{ blockById.get(cut.source_block_id)?.presentation || cut.source_block_id }}
+					</button>
+				</div>
 				<article
 					v-for="chapter in chapters"
 					:key="chapter.chapter_id"
@@ -585,6 +616,9 @@ export default defineComponent({
 		const showCutsPane = ref(true);
 		const showEditsPane = ref(true);
 		const showRawText = ref(false);
+		const highlightedBlockId = ref("");
+		const highlightedCutId = ref("");
+		const highlightedEditCutId = ref("");
 
 		const channelUuid = computed(() => alienHandChannelUuidFromName(props.channel.name));
 		const activeCuts = computed(() => cuts.value.filter((cut) => cut.status === "active"));
@@ -852,6 +886,9 @@ export default defineComponent({
 
 		const editDraftKey = (chapterId: string) => targetKey("chapter-edit", chapterId);
 
+		const sourceElementId = (sourceType: "block" | "cut", sourceId: string) =>
+			`alienhand-${sourceType}-${sourceId.replace(/[^a-z0-9_-]/gi, "_")}`;
+
 		const canCreateBookmark = (targetType: AlienHandRefinementTargetType, targetId: string) => {
 			const key = bookmarkKey(targetType, targetId);
 			return Boolean(bookmarkDrafts.value[key]?.trim()) && pendingBookmarkKey.value !== key;
@@ -1035,6 +1072,30 @@ export default defineComponent({
 
 		const formatJson = (value: unknown) => JSON.stringify(value, null, 2);
 
+		const scrollSourceIntoView = (sourceType: "block" | "cut", sourceId: string) => {
+			window.requestAnimationFrame(() => {
+				const element = document.getElementById(sourceElementId(sourceType, sourceId));
+
+				if (element) {
+					element.scrollIntoView({behavior: "smooth", block: "center"});
+				}
+			});
+		};
+
+		const revealCutSource = (cut: AlienHandConversationCut) => {
+			highlightedCutId.value = cut.cut_id;
+			highlightedBlockId.value = cut.source_block_id;
+			highlightedEditCutId.value = cut.cut_id;
+
+			if (showCutsPane.value) {
+				scrollSourceIntoView("cut", cut.cut_id);
+			}
+
+			if (showRawPane.value) {
+				scrollSourceIntoView("block", cut.source_block_id);
+			}
+		};
+
 		const onSourceMessageSelected = (block: AlienHandConversationBlockInput) => {
 			if (block.channel_uuid !== channelUuid.value) {
 				return;
@@ -1068,6 +1129,9 @@ export default defineComponent({
 				quoteDrafts.value = {};
 				editDrafts.value = {};
 				searchHitBlockIds.value = new Set();
+				highlightedBlockId.value = "";
+				highlightedCutId.value = "";
+				highlightedEditCutId.value = "";
 				await refresh();
 			},
 			{immediate: true}
@@ -1107,6 +1171,9 @@ export default defineComponent({
 			firstSticky,
 			formatJson,
 			formatTimestamp,
+			highlightedBlockId,
+			highlightedCutId,
+			highlightedEditCutId,
 			insertSelectedSource,
 			loading,
 			pendingBlockId,
@@ -1121,6 +1188,7 @@ export default defineComponent({
 			removeCut,
 			removeFirstSticky,
 			removeSticky,
+			revealCutSource,
 			runSearch,
 			searchHitBlockIds,
 			searchTerm,
@@ -1129,6 +1197,7 @@ export default defineComponent({
 			showEditsPane,
 			showRawPane,
 			showRawText,
+			sourceElementId,
 			stickies,
 			targetBookmarks,
 			targetQuotes,
