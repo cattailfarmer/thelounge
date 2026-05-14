@@ -612,7 +612,7 @@ export default defineComponent({
 		const searchHitBlockIds = ref(new Set<string>());
 		const chapterTitle = ref("");
 		const chapterSummary = ref("");
-		const showRawPane = ref(false);
+		const showRawPane = ref(true);
 		const showCutsPane = ref(true);
 		const showEditsPane = ref(true);
 		const showRawText = ref(false);
