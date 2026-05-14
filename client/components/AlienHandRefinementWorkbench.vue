@@ -691,6 +691,8 @@ export default defineComponent({
 		const bridgeDragStartY = ref(0);
 		const bridgeDragStartTop = ref(520);
 		const sourceRevealStatus = ref("");
+		const directiveSyncStatus = ref("");
+		let directivePollTimer: ReturnType<typeof window.setInterval> | null = null;
 
 		const channelUuid = computed(() => alienHandChannelUuidFromName(props.channel.name));
 		const activeCuts = computed(() => cuts.value.filter((cut) => cut.status === "active"));
@@ -759,6 +761,10 @@ export default defineComponent({
 
 			if (sourceRevealStatus.value) {
 				items.push({kind: "info", text: sourceRevealStatus.value});
+			}
+
+			if (directiveSyncStatus.value) {
+				items.push({kind: "info", text: directiveSyncStatus.value});
 			}
 
 			if (error.value) {
@@ -902,6 +908,33 @@ export default defineComponent({
 				error.value = caught instanceof Error ? caught.message : String(caught);
 			} finally {
 				loading.value = false;
+			}
+		};
+
+		const pollDirectiveLedger = async () => {
+			if (!channelUuid.value || loading.value) {
+				return;
+			}
+
+			try {
+				const nextDirectives = await listAlienHandRefinementDirectives(
+					channelUuid.value,
+					latestDirectiveSequence.value,
+					20
+				);
+
+				if (!nextDirectives.length) {
+					return;
+				}
+
+				directiveSyncStatus.value = `Directive ledger sync saw ${
+					nextDirectives.length
+				} remote event${nextDirectives.length === 1 ? "" : "s"}.`;
+				await refresh();
+			} catch (caught) {
+				directiveSyncStatus.value = `Directive ledger sync waiting: ${
+					caught instanceof Error ? caught.message : String(caught)
+				}`;
 			}
 		};
 
@@ -1449,10 +1482,18 @@ export default defineComponent({
 
 		onMounted(() => {
 			eventbus.on("alienhand:source-message:selected", onSourceMessageSelected);
+			directivePollTimer = window.setInterval(() => {
+				void pollDirectiveLedger();
+			}, 5000);
 		});
 
 		onBeforeUnmount(() => {
 			eventbus.off("alienhand:source-message:selected", onSourceMessageSelected);
+
+			if (directivePollTimer !== null) {
+				window.clearInterval(directivePollTimer);
+				directivePollTimer = null;
+			}
 		});
 
 		watch(
@@ -1538,6 +1579,7 @@ export default defineComponent({
 			cutScroller,
 			cutSourcePresentation,
 			directoryTab,
+			directiveSyncStatus,
 			directives,
 			editDiffs,
 			editDiffsForEdit,
