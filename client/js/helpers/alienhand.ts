@@ -417,10 +417,12 @@ export async function listAlienHandRefinementDirectives(
 }
 
 export async function searchAlienHandRefinement(
-	query: string
+	query: string,
+	channelUuid?: string
 ): Promise<AlienHandRefinementSearchHit[]> {
+	const channelQuery = channelUuid ? `&channel=${encodeURIComponent(channelUuid)}` : "";
 	const response = await fetchAlienHandRefinement<{hits?: AlienHandRefinementSearchHit[]}>(
-		`/search?q=${encodeURIComponent(query)}`
+		`/search?q=${encodeURIComponent(query)}${channelQuery}`
 	);
 
 	return response.hits || [];

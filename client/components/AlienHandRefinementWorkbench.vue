@@ -974,7 +974,7 @@ export default defineComponent({
 			error.value = "";
 
 			try {
-				const hits = await searchAlienHandRefinement(term);
+				const hits = await searchAlienHandRefinement(term, channelUuid.value);
 				searchHitBlockIds.value = new Set(hits.map((hit) => hit.block_id));
 			} catch (caught) {
 				error.value = caught instanceof Error ? caught.message : String(caught);
