@@ -616,6 +616,7 @@ import {
 	listAlienHandRefinementBookmarks,
 	listAlienHandRefinementChapters,
 	listAlienHandRefinementCuts,
+	listAlienHandRefinementDirectives,
 	listAlienHandRefinementEditDiffs,
 	listAlienHandRefinementEdits,
 	listAlienHandRefinementQuotes,
@@ -629,6 +630,7 @@ import {
 	type AlienHandConversationBlockInput,
 	type AlienHandConversationChapter,
 	type AlienHandConversationCut,
+	type AlienHandConversationDirective,
 	type AlienHandConversationEdit,
 	type AlienHandConversationEditDiff,
 	type AlienHandConversationQuote,
@@ -654,6 +656,7 @@ export default defineComponent({
 		const edits = ref<AlienHandConversationEdit[]>([]);
 		const editDiffs = ref<AlienHandConversationEditDiff[]>([]);
 		const tocEntries = ref<AlienHandConversationTocEntry[]>([]);
+		const directives = ref<AlienHandConversationDirective[]>([]);
 		const selectedSourceBlock = ref<AlienHandConversationBlockInput | null>(null);
 		const bookmarkDrafts = ref<Record<string, string>>({});
 		const quoteDrafts = ref<Record<string, string>>({});
@@ -699,6 +702,12 @@ export default defineComponent({
 				? "end of Cutting"
 				: `before cut ${insertionPosition.value + 1}`
 		);
+		const latestDirectiveSequence = computed(() =>
+			directives.value.reduce(
+				(maxSequence, directive) => Math.max(maxSequence, directive.sequence || 0),
+				0
+			)
+		);
 		const bridgeBlockedReason = computed(() => {
 			if (!showRawPane.value || !showCutsPane.value) {
 				return "Bridge blocked: show Chat and Cutting to insert source blocks.";
@@ -740,6 +749,13 @@ export default defineComponent({
 					text: `Ready to cut @${selectedSourceBlock.value.sender} at ${insertionLabel.value}.`,
 				});
 			}
+
+			items.push({
+				kind: directives.value.length ? "ready" : "blocked",
+				text: directives.value.length
+					? `${directives.value.length} directive ledger events, latest #${latestDirectiveSequence.value}.`
+					: "No directive ledger events for this channel.",
+			});
 
 			if (sourceRevealStatus.value) {
 				items.push({kind: "info", text: sourceRevealStatus.value});
@@ -822,6 +838,7 @@ export default defineComponent({
 					bookmarks: bookmarks.value,
 					chapters: chapters.value,
 					cuts: cuts.value,
+					directives: directives.value,
 					editDiffs: editDiffs.value,
 					edits: edits.value,
 					quotes: quotes.value,
@@ -854,6 +871,7 @@ export default defineComponent({
 					nextEdits,
 					nextEditDiffs,
 					nextTocEntries,
+					nextDirectives,
 				] = await Promise.all([
 					listAlienHandRefinementBlocks(channelUuid.value),
 					listAlienHandRefinementCuts(channelUuid.value),
@@ -865,6 +883,7 @@ export default defineComponent({
 					listAlienHandRefinementEdits(),
 					listAlienHandRefinementEditDiffs(),
 					listAlienHandRefinementToc("main"),
+					listAlienHandRefinementDirectives(channelUuid.value),
 				]);
 
 				blocks.value = nextBlocks;
@@ -877,6 +896,7 @@ export default defineComponent({
 				edits.value = nextEdits;
 				editDiffs.value = nextEditDiffs;
 				tocEntries.value = nextTocEntries;
+				directives.value = nextDirectives;
 				sourceRevealStatus.value = "Refinement state refreshed.";
 			} catch (caught) {
 				error.value = caught instanceof Error ? caught.message : String(caught);
@@ -1518,6 +1538,7 @@ export default defineComponent({
 			cutScroller,
 			cutSourcePresentation,
 			directoryTab,
+			directives,
 			editDiffs,
 			editDiffsForEdit,
 			editDraftKey,

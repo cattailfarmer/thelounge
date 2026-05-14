@@ -110,6 +110,20 @@ export type AlienHandConversationTocEntry = {
 	source_scope: Record<string, unknown>;
 };
 
+export type AlienHandConversationDirective = {
+	sequence: number;
+	directive_id: string;
+	channel_uuid: string;
+	directive_kind: string;
+	source: string;
+	visibility: string;
+	target_type: string;
+	target_id: string;
+	payload: Record<string, unknown>;
+	result_ref: Record<string, unknown>;
+	created_at: string;
+};
+
 export type AlienHandRefinementSearchHit = {
 	term: string;
 	block_id: string;
@@ -383,6 +397,23 @@ export async function listAlienHandRefinementToc(
 	}>(`/toc?toc_id=${encodeURIComponent(tocId)}`);
 
 	return response.entries || [];
+}
+
+export async function listAlienHandRefinementDirectives(
+	channelUuid: string,
+	afterSequence?: number,
+	limit?: number
+): Promise<AlienHandConversationDirective[]> {
+	const afterQuery =
+		typeof afterSequence === "number"
+			? `&after_sequence=${encodeURIComponent(afterSequence)}`
+			: "";
+	const limitQuery = typeof limit === "number" ? `&limit=${encodeURIComponent(limit)}` : "";
+	const response = await fetchAlienHandRefinement<{
+		directives?: AlienHandConversationDirective[];
+	}>(`/directives?channel=${encodeURIComponent(channelUuid)}${afterQuery}${limitQuery}`);
+
+	return response.directives || [];
 }
 
 export async function searchAlienHandRefinement(
