@@ -627,6 +627,10 @@
 			<button class="btn btn-sm" @click="showRawText = !showRawText">
 				{{ showRawText ? "Hide" : "Show" }} raw text
 			</button>
+			<p class="alienhand-workbench__shortcuts">
+				Keyboard shortcuts: Ctrl+Alt+1 Chat, Ctrl+Alt+2 Cutting, Ctrl+Alt+3 Editing,
+				Ctrl+Alt+R raw text, Ctrl+Alt+H history, Ctrl+Alt+Enter insert selected source.
+			</p>
 			<pre v-if="showRawText">{{ rawDebugText }}</pre>
 		</footer>
 	</section>
@@ -733,6 +737,7 @@ export default defineComponent({
 		const sourceRevealStatus = ref("");
 		const directiveSyncStatus = ref("");
 		const historyStatus = ref("");
+		const keyboardShortcutStatus = ref("");
 		let directivePollTimer: ReturnType<typeof window.setInterval> | null = null;
 
 		const channelUuid = computed(() => alienHandChannelUuidFromName(props.channel.name));
@@ -812,6 +817,10 @@ export default defineComponent({
 
 			if (historyStatus.value) {
 				items.push({kind: "info", text: historyStatus.value});
+			}
+
+			if (keyboardShortcutStatus.value) {
+				items.push({kind: "info", text: keyboardShortcutStatus.value});
 			}
 
 			if (error.value) {
@@ -1084,6 +1093,61 @@ export default defineComponent({
 			}
 
 			await insertSelectedSource();
+		};
+
+		const shortcutTargetIsEditable = (target: EventTarget | null) => {
+			if (!(target instanceof HTMLElement)) {
+				return false;
+			}
+
+			return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+		};
+
+		const handleWorkbenchShortcut = (event: KeyboardEvent) => {
+			if (!event.ctrlKey || !event.altKey || event.metaKey || event.shiftKey) {
+				return;
+			}
+
+			if (shortcutTargetIsEditable(event.target)) {
+				return;
+			}
+
+			const key = event.key.toLowerCase();
+
+			if (key === "1") {
+				event.preventDefault();
+				showRawPane.value = !showRawPane.value;
+				keyboardShortcutStatus.value = `Ctrl+Alt+1 toggled Chat ${
+					showRawPane.value ? "on" : "off"
+				}.`;
+			} else if (key === "2") {
+				event.preventDefault();
+				showCutsPane.value = !showCutsPane.value;
+				keyboardShortcutStatus.value = `Ctrl+Alt+2 toggled Cutting ${
+					showCutsPane.value ? "on" : "off"
+				}.`;
+			} else if (key === "3") {
+				event.preventDefault();
+				showEditsPane.value = !showEditsPane.value;
+				keyboardShortcutStatus.value = `Ctrl+Alt+3 toggled Editing ${
+					showEditsPane.value ? "on" : "off"
+				}.`;
+			} else if (key === "r") {
+				event.preventDefault();
+				showRawText.value = !showRawText.value;
+				keyboardShortcutStatus.value = `Ctrl+Alt+R toggled raw text ${
+					showRawText.value ? "on" : "off"
+				}.`;
+			} else if (key === "h") {
+				event.preventDefault();
+				keyboardShortcutStatus.value = "Ctrl+Alt+H requested channel history.";
+				void loadHistory();
+			} else if (event.key === "Enter") {
+				event.preventDefault();
+				keyboardShortcutStatus.value =
+					"Ctrl+Alt+Enter inserts selected source at the Cutting pointer.";
+				void insertSelectedSource();
+			}
 		};
 
 		const updateInsertionFromClientY = (clientY: number) => {
@@ -1622,6 +1686,7 @@ export default defineComponent({
 			directivePollTimer = window.setInterval(() => {
 				void pollDirectiveLedger();
 			}, 5000);
+			window.addEventListener("keydown", handleWorkbenchShortcut);
 		});
 
 		onBeforeUnmount(() => {
@@ -1635,6 +1700,8 @@ export default defineComponent({
 				window.clearInterval(directivePollTimer);
 				directivePollTimer = null;
 			}
+
+			window.removeEventListener("keydown", handleWorkbenchShortcut);
 		});
 
 		watch(
@@ -1663,6 +1730,7 @@ export default defineComponent({
 				selectedChapterId.value = "";
 				sourceRevealStatus.value = "";
 				historyStatus.value = "";
+				keyboardShortcutStatus.value = "";
 				await refresh();
 			},
 			{immediate: true}
@@ -1746,6 +1814,7 @@ export default defineComponent({
 			insertionLabel,
 			insertSelectedSource,
 			insertFromBridge,
+			keyboardShortcutStatus,
 			loading,
 			loadingHistory,
 			loadHistory,

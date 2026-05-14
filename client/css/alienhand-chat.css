@@ -778,6 +778,13 @@
 	padding: 0.45rem 0.6rem;
 }
 
+#chat .alienhand-workbench__shortcuts {
+	color: var(--alienhand-muted);
+	font-size: 0.72rem;
+	line-height: 1.35;
+	margin: 0.45rem 0 0;
+}
+
 #chat .alienhand-workbench__footer pre {
 	background: var(--alienhand-code-bg);
 	border-radius: 8px;
